@@ -22,6 +22,6 @@ dependencyResolutionManagement {
 }
 
 
-rootProject.name = "CVSS_Client"
+rootProject.name = "CVSSClient"
 include(":app")
  

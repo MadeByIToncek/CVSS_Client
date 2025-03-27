@@ -5,7 +5,9 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
+
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -16,7 +18,18 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CVSSClientTheme"
+        android:usesCleartextTraffic="true"
         tools:targetApi="31">
+        <activity
+            android:name=".MatchManagerActivity"
+            android:exported="false"
+            android:label="@string/title_activity_match_manager"
+            android:theme="@style/Theme.CVSSClientTheme" />
+        <activity
+            android:name=".TeamManagerActivity"
+            android:exported="false"
+            android:label="@string/title_activity_team_manager"
+            android:theme="@style/Theme.CVSSClientTheme" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,15 +1,10 @@
 package space.itoncek.cvss.client
 
-import android.Manifest
-import android.content.pm.PackageManager.PERMISSION_GRANTED
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.ManagedActivityResultLauncher
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +20,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,18 +35,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.Wallpapers
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import de.markusfisch.android.barcodescannerview.widget.BarcodeScannerView
-import de.markusfisch.android.zxingcpp.ZxingCpp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import space.itoncek.cvss.client.ui.theme.Primary
+import java.io.File
+import java.io.FileWriter
+import java.util.Scanner
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,26 +63,11 @@ class MainActivity : ComponentActivity() {
     showBackground = true,
     uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL,
     wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE,
-    showSystemUi = true,
-    device = "id:Galaxy A54 5G"
 )
 @Composable
 fun NarrowCasterMainMenu() {
-    var hasPermission by remember { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // Permission Accepted: Do something
-            Log.d(MainActivity::class.qualifiedName, "PERMISSION GRANTED")
-            hasPermission = true;
-        } else {
-            // Permission Denied: Do something
-            Log.d(MainActivity::class.qualifiedName, "PERMISSION DENIED")
-            hasPermission = false;
-        }
-    }
-    val context = LocalContext.current
+    var url by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
 
     CVSSClientTheme {
         Column(
@@ -148,77 +131,55 @@ fun NarrowCasterMainMenu() {
                     .wrapContentHeight(),
                 elevation = CardDefaults.elevatedCardElevation(8.dp)
             ) {
-                if (LocalInspectionMode.current) {
-                    GeneratePermissionCard(launcher, true)
-                } else {
-                    if (hasPermission) {
-                        GenerateQRReader()
-                    } else {
-                        when (ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.CAMERA
-                        )) {
-                            PERMISSION_GRANTED -> {
-                                GenerateQRReader()
-                            }
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TextField(
+                        url, onValueChange = {
+                            url = it;
+                            val fw = FileWriter(File(ctx.filesDir.toString() + "/config.cfg"))
+                            fw.write(it)
+                            fw.close()
+                        }, modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    )
 
-                            else -> {
-                                GeneratePermissionCard(launcher, false)
+                    Button(onClick = {
+                        ctx.startActivity(Intent(ctx, TeamManagerActivity::class.java))
+                    }) {
+                        Text("Login")
+                    }
+                }
+            }
+            val dev = LocalInspectionMode.current;
+            val ctx = LocalContext.current;
+            val lifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(LocalContext.current) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_START && !dev) {
+                        if (ctx.filesDir == null) {
+                            url = "http://localhost:4444"
+                        }
+                        val cfgfile: File = File(ctx.filesDir.toString() + "/config.cfg")
+                        if (cfgfile.exists()) {
+                            Scanner(cfgfile).use { sc ->
+                                url = ""
+                                while (sc.hasNextLine()) {
+                                    url += sc.nextLine()
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
-    }
-}
+                lifecycleOwner.lifecycle.addObserver(observer)
 
-@Composable
-fun GenerateQRReader() {
-    AndroidView(modifier = Modifier.fillMaxSize(), // Occupy the max size in the Compose UI tree
-        factory = { context ->
-            // Creates view
-            BarcodeScannerView(context).apply {
-                cropRatio = 0.75f;
-                formats.clear()
-                formats.add(ZxingCpp.BarcodeFormat.PDF_417)
-
-                setOnBarcodeListener { result ->
-                    Log.i(MainActivity::class.qualifiedName, result.text)
-                    return@setOnBarcodeListener true
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
                 }
-
-                openAsync()
             }
-        }, update = { view ->
-            view.close();
-            view.openAsync();
-        })
-}
-
-@Composable
-fun GeneratePermissionCard(
-    launcher: ManagedActivityResultLauncher<String, Boolean>,
-    isdev: Boolean
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight()
-            .padding(12.dp)
-    ) {
-        Text(
-            text = "To use this app, you must give us Camera permission to scan the PDF code from the console.",
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        Button(onClick = {
-            launcher.launch(Manifest.permission.CAMERA)
-        }) {
-            Text("Grant Camera Permission")
         }
-        if (isdev) Text(text = "This is dev mode!", color = MaterialTheme.colorScheme.onError)
     }
 }
 
