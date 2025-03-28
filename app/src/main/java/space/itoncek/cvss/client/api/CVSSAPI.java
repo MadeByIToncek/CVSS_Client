@@ -16,6 +16,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import space.itoncek.cvss.client.api.objects.Match;
 import space.itoncek.cvss.client.api.objects.Team;
 
 public class CVSSAPI {
@@ -76,6 +77,48 @@ public class CVSSAPI {
             if (!res.body().string().trim().equals("ok")) {
                 throw new IOException("Unable to update the team!");
             }
+        }
+    }
+
+    public @Nullable ArrayList<Match> listMatches() throws IOException, JSONException {
+        Request request = new Request.Builder().url(url + "/teams/teams").build();
+
+        try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
+            JSONArray arr = new JSONArray(res.body().string());
+            ArrayList<Match> at = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+
+                at.add(new Match(o.getInt("id"), Match.State.valueOf(o.getString("state")), Match.Result.valueOf(o.getString("result")), getTeam(o.getInt("left")), getTeam(o.getInt("right"))));
+            }
+            return at;
+        }
+    }
+
+    private @Nullable Team getTeam(int teamId) throws JSONException, IOException {
+        Request request = new Request.Builder()
+                .url(url + "/teams/team")
+                .put(RequestBody.create(new JSONObject().put("id", teamId).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            if (res.body() == null) return null;
+            JSONObject o = new JSONObject(res.body().string());
+            return new Team(o.getInt("id"), o.getString("name"));
+        }
+    }
+
+    public @Nullable Match getMatch(int matchId) throws JSONException, IOException {
+        Request request = new Request.Builder()
+                .url(url + "/teams/match")
+                .put(RequestBody.create(new JSONObject().put("id", matchId).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            if (res.body() == null) return null;
+            JSONObject o = new JSONObject(res.body().string());
+            return new Match(o.getInt("id"), Match.State.valueOf(o.getString("state")), Match.Result.valueOf(o.getString("result")), getTeam(o.getInt("left")), getTeam(o.getInt("right")));
         }
     }
 }

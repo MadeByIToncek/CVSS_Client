@@ -136,14 +136,18 @@ fun NarrowCasterMainMenu() {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     TextField(
-                        url, onValueChange = {
+                        value = url,
+                        onValueChange = {
                             url = it;
                             val fw = FileWriter(File(ctx.filesDir.toString() + "/config.cfg"))
                             fw.write(it)
                             fw.close()
                         }, modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp)
+                            .padding(bottom = 16.dp),
+                        placeholder = {
+                            Text("Server URL", color = Color.Gray)
+                        }
                     )
 
                     Button(onClick = {

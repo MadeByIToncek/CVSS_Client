@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
@@ -125,9 +126,9 @@ fun MainUI() {
 
                             Spacer(modifier = Modifier.weight(1f))
                             Button(onClick = {
-                                showBottomSheet = true
                                 editingTeam = teams[team].id;
                                 editingTeamName = teams[team].name;
+                                showBottomSheet = true
                             }) {
                                 Text("Edit")
                             }
@@ -150,9 +151,14 @@ fun MainUI() {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         var teamName by remember { mutableStateOf(editingTeamName) }
-                        TextField(teamName, onValueChange = {
-                            teamName = it
-                        }, modifier = Modifier.fillMaxWidth())
+                        TextField(teamName,
+                            onValueChange = {
+                                teamName = it
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text("Team name", color = Color.Gray)
+                            })
                         Row {
                             Button(
                                 onClick = {
