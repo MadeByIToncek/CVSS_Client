@@ -27,6 +27,8 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -54,6 +56,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import space.itoncek.cvss.client.api.CVSSAPI
+import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
 import space.itoncek.cvss.client.api.objects.Team
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
@@ -71,6 +74,9 @@ class TeamManagerActivity : ComponentActivity() {
 }
 
 fun runOnUiThread(block: suspend () -> Unit) = CoroutineScope(Dispatchers.Main).launch { block() }
+
+
+var teamHandler: EventStreamWebsocketHandler? = null
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +97,18 @@ fun MainUI() {
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background),
+            topBar = {
+                TopAppBar(
+                    colors = topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.primary,
+                    ),
+                    title = {
+                        Text("Team manager")
+                    }
+                )
+            }
         ) { innerPadding ->
             Log.w(TeamManagerActivity::class.qualifiedName, "Init'd")
             var showBottomSheet by remember { mutableStateOf(false) }
@@ -108,7 +125,11 @@ fun MainUI() {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp)
+                            .padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 16.dp
+                            )
                             .wrapContentHeight(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -199,11 +220,6 @@ fun MainUI() {
                         }
                     }
                     // Sheet content
-                    Button(onClick = {
-
-                    }) {
-                        Text("Hide bottom sheet")
-                    }
                 }
             }
         }
@@ -215,6 +231,9 @@ fun MainUI() {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START && !dev) {
                 updateTeams(api, teams)
+                teamHandler = api.createEventHandler({
+                    updateTeams(api, teams)
+                }, {});
             } else if (dev) {
                 teams.clear()
                 teams.add(Team(-1, "Dev mode!"))
@@ -225,12 +244,14 @@ fun MainUI() {
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
+            teamHandler?.close();
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 }
 
 fun updateTeams(api: CVSSAPI, teams: SnapshotStateList<Team>) {
+    Log.i("updating()", "Updating teams")
     thread {
         val t = api.listTeams()
 

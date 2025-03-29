@@ -1,5 +1,7 @@
 package space.itoncek.cvss.client.api;
 
+import android.util.Log;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.json.JSONArray;
@@ -81,16 +83,18 @@ public class CVSSAPI {
     }
 
     public @Nullable ArrayList<Match> listMatches() throws IOException, JSONException {
-        Request request = new Request.Builder().url(url + "/teams/teams").build();
+        Request request = new Request.Builder().url(url + "/teams/matches").build();
 
         try (Response res = client.newCall(request).execute()) {
             assert res.body() != null;
-            JSONArray arr = new JSONArray(res.body().string());
+            String body = res.body().string();
+            Log.i(this.getClass().getName(), body);
+            JSONArray arr = new JSONArray(body);
             ArrayList<Match> at = new ArrayList<>();
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
 
-                at.add(new Match(o.getInt("id"), Match.State.valueOf(o.getString("state")), Match.Result.valueOf(o.getString("result")), getTeam(o.getInt("left")), getTeam(o.getInt("right"))));
+                at.add(new Match(o.getInt("id"), Match.State.valueOf(o.getString("state")), Match.Result.valueOf(o.getString("result")), getTeam(o.getInt("leftTeamId")), getTeam(o.getInt("rightTeamId"))));
             }
             return at;
         }
@@ -118,7 +122,41 @@ public class CVSSAPI {
         try (Response res = client.newCall(request).execute()) {
             if (res.body() == null) return null;
             JSONObject o = new JSONObject(res.body().string());
-            return new Match(o.getInt("id"), Match.State.valueOf(o.getString("state")), Match.Result.valueOf(o.getString("result")), getTeam(o.getInt("left")), getTeam(o.getInt("right")));
+            return new Match(o.getInt("id"), Match.State.valueOf(o.getString("state")), Match.Result.valueOf(o.getString("result")), getTeam(o.getInt("leftTeamId")), getTeam(o.getInt("rightTeamId")));
         }
+    }
+
+    public void updateMatch(int matchId, @NotNull Match.State matchState, @NotNull Match.Result result, int leftTeamId, int rightTeamId) throws IOException, JSONException {
+        Request request = new Request.Builder()
+                .patch(RequestBody.create(new JSONObject()
+                                .put("id", matchId)
+                                .put("matchState", matchState)
+                                .put("result", result)
+                                .put("leftTeamId", leftTeamId)
+                                .put("rightTeamId", rightTeamId)
+                                .toString(4),
+                        MediaType.parse("application/json")))
+                .url(url + "/teams/match")
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            if (!res.body().string().trim().equals("ok")) {
+                throw new IOException("Unable to update the team!");
+            }
+        }
+    }
+
+    public EventStreamWebsocketHandler createEventHandler(@NotNull Runnable teamUpdateEvent, @NotNull Runnable matchUpdateEvent) {
+        return new EventStreamWebsocketHandler(url + "/stream/event") {
+            @Override
+            public void teamUpdateEvent() {
+                teamUpdateEvent.run();
+            }
+
+            @Override
+            public void matchUpdateEvent() {
+                matchUpdateEvent.run();
+            }
+        };
     }
 }
