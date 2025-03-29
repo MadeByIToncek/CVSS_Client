@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+const val serverVersion = "v0.0.0.1"
+const val devVersion = "vDEVELOPMENT"
+
 @Composable
 fun GlobalNavigation(i: ScreenView, scope: CoroutineScope, drawerState: DrawerState, ctx: Context) {
     ModalDrawerSheet {
@@ -73,7 +76,7 @@ fun GlobalNavigation(i: ScreenView, scope: CoroutineScope, drawerState: DrawerSt
                 style = MaterialTheme.typography.titleMedium
             )
             NavigationDrawerItem(
-                label = { Text("Game setup") },
+                label = { Text("Setup next game") },
                 selected = i == ScreenView.GameSetup,
                 onClick = {
                     if (i != ScreenView.GameSetup) {
@@ -81,7 +84,7 @@ fun GlobalNavigation(i: ScreenView, scope: CoroutineScope, drawerState: DrawerSt
                         ctx.startActivity(
                             Intent(
                                 ctx, /*TODO)) Replace*/
-                                MatchManagerActivity::class.java
+                                SetupNextGameActivity::class.java
                             )
                         )
                         (ctx as Activity).finish()

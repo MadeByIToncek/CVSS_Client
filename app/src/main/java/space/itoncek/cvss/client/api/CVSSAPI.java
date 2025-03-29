@@ -43,20 +43,38 @@ public class CVSSAPI {
         }
     }
 
-    public long getPing() throws IOException {
-        Request request = new Request.Builder().url(url + "/time").build();
+    public long getPing() {
+        try {
+            Request request = new Request.Builder().url(url + "/time").build();
 
-        long start = System.currentTimeMillis();
-        Response execute = client.newCall(request).execute();
-        long end = System.currentTimeMillis();
+            long start = System.currentTimeMillis();
+            Response execute = client.newCall(request).execute();
+            long end = System.currentTimeMillis();
 
-        assert execute.body() != null;
-        long mid = Long.parseLong(execute.body().string());
-        execute.close();
-        return ((mid - start) + (end - mid)) / 2L;
+            assert execute.body() != null;
+            long mid = Long.parseLong(execute.body().string());
+            execute.close();
+            return ((mid - start) + (end - mid)) / 2L;
+        } catch (IOException e) {
+            return -1;
+        }
     }
 
-    public @Nullable ArrayList<Team> listTeams() throws IOException, JSONException {
+    @NotNull
+    public String getVersion() {
+        Request request = new Request.Builder().url(url).build();
+        try (Response execute = client.newCall(request).execute()) {
+            if (execute.body() != null) {
+                return execute.body().string();
+            } else {
+                return "v-1.-1.-1.-1";
+            }
+        } catch (IOException e) {
+            return e.toString();
+        }
+    }
+
+    public @Nullable ArrayList<Team> listTeams() throws JSONException {
         Request request = new Request.Builder().url(url + "/teams/teams").build();
 
         try (Response res = client.newCall(request).execute()) {
@@ -69,6 +87,8 @@ public class CVSSAPI {
                 at.add(new Team(o.getInt("id"), o.getString("name")));
             }
             return at;
+        } catch (IOException e) {
+            return null;
         }
     }
 
@@ -88,7 +108,6 @@ public class CVSSAPI {
         try (Response res = client.newCall(request).execute()) {
             assert res.body() != null;
             String body = res.body().string();
-            Log.i(this.getClass().getName(), body);
             JSONArray arr = new JSONArray(body);
             ArrayList<Match> at = new ArrayList<>();
             for (int i = 0; i < arr.length(); i++) {
@@ -100,7 +119,7 @@ public class CVSSAPI {
         }
     }
 
-    private @Nullable Team getTeam(int teamId) throws JSONException, IOException {
+    public @Nullable Team getTeam(int teamId) throws JSONException, IOException {
         Request request = new Request.Builder()
                 .url(url + "/teams/team")
                 .put(RequestBody.create(new JSONObject().put("id", teamId).toString(4), MediaType.parse("application/json")))
@@ -158,5 +177,49 @@ public class CVSSAPI {
                 matchUpdateEvent.run();
             }
         };
+    }
+
+    public boolean deleteTeam(int teamId) throws JSONException, IOException {
+        Request request = new Request.Builder()
+                .url(url + "/teams/team")
+                .delete(RequestBody.create(new JSONObject().put("id", teamId).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            return res.body().string().trim().equals("ok");
+        }
+    }
+
+    public boolean deleteMatch(int matchId) throws IOException, JSONException {
+        Request request = new Request.Builder()
+                .url(url + "/teams/match")
+                .delete(RequestBody.create(new JSONObject().put("id", matchId).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            return res.body().string().trim().equals("ok");
+        }
+    }
+
+    public boolean createTeam(@NotNull String teamName) throws IOException, JSONException {
+        Request request = new Request.Builder()
+                .url(url + "/teams/team")
+                .post(RequestBody.create(new JSONObject().put("name", teamName).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            return res.body().string().trim().equals("ok");
+        }
+    }
+
+    public boolean createMatch(int leftTeamId, int rightTeamId) throws JSONException, IOException {
+        Request request = new Request.Builder()
+                .url(url + "/teams/match")
+                .post(RequestBody.create(new JSONObject().put("leftTeamId", leftTeamId).put("rightTeamId", rightTeamId).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            return res.body().string().trim().equals("ok");
+        }
     }
 }

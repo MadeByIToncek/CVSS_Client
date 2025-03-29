@@ -2,4 +2,5 @@
     <string name="app_name">CVSS Client</string>
     <string name="title_activity_team_manager">TeamManagerActivity</string>
     <string name="title_activity_match_manager">MatchManagerActivity</string>
+    <string name="title_activity_setup_next_game">SetupNextGameActivity</string>
 </resources>

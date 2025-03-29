@@ -3,6 +3,7 @@ package space.itoncek.cvss.client
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,17 +16,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
@@ -33,6 +45,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -87,6 +100,12 @@ fun MainUI() {
     val teams = remember { mutableStateListOf<Team>() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var showBottomSheet by remember { mutableStateOf(false) }
+    var createInsteadOfEdit by remember { mutableStateOf(false) }
+    var editingTeam by remember { mutableIntStateOf(-1) }
+    var editingTeamName by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState()
+    var showDeletionDialog by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
         drawerContent = {
@@ -106,15 +125,55 @@ fun MainUI() {
                     ),
                     title = {
                         Text("Team manager")
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    drawerState.open()
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Filled.Menu, "menu")
+                        }
                     }
                 )
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        createInsteadOfEdit = true
+                        editingTeamName = ""
+                        showBottomSheet = true
+                    },
+                ) {
+                    Icon(Icons.Filled.Add, "Floating action button.")
+                }
             }
         ) { innerPadding ->
-            Log.w(TeamManagerActivity::class.qualifiedName, "Init'd")
-            var showBottomSheet by remember { mutableStateOf(false) }
-            var editingTeam by remember { mutableIntStateOf(-1) }
-            var editingTeamName by remember { mutableStateOf("") }
-            val sheetState = rememberModalBottomSheetState()
+            if (showDeletionDialog) {
+                DeleteTeamDialog(
+                    onClose = { showDeletionDialog = false },
+                    onDelete = {
+                        showDeletionDialog = false
+                        thread {
+                            if (!api.deleteTeam(editingTeam)) {
+                                runOnUiThread {
+                                    Toast.makeText(
+                                        ctx,
+                                        "Unable to delete that team, check if there are some matches, they are associated with!",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                            editingTeam = -1
+                        }
+                    },
+                    editingTeam,
+                    api
+                )
+            }
+
             LazyColumn(
                 Modifier
                     .fillMaxSize()
@@ -146,12 +205,21 @@ fun MainUI() {
                             Text(teams[team].name)
 
                             Spacer(modifier = Modifier.weight(1f))
-                            Button(onClick = {
+                            FilledIconButton(
+                                onClick = {
+                                    editingTeam = teams[team].id;
+                                    showDeletionDialog = true;
+                                }
+                            ) {
+                                Icon(Icons.Filled.Delete, "")
+                            }
+                            FilledIconButton(onClick = {
+                                createInsteadOfEdit = false
+                                showBottomSheet = true
                                 editingTeam = teams[team].id;
                                 editingTeamName = teams[team].name;
-                                showBottomSheet = true
                             }) {
-                                Text("Edit")
+                                Icon(Icons.Filled.Edit, "")
                             }
                         }
                     }
@@ -202,13 +270,20 @@ fun MainUI() {
                             Button(
                                 onClick = {
                                     thread {
-                                        api.updateTeam(editingTeam, teamName)
+                                        if (createInsteadOfEdit) {
+                                            api.createTeam(teamName)
+                                        } else {
+                                            api.updateTeam(editingTeam, teamName)
+                                        }
                                     }.join()
                                     updateTeams(api, teams)
 
                                     scope.launch { sheetState.hide() }.invokeOnCompletion {
                                         if (!sheetState.isVisible) {
+                                            createInsteadOfEdit = false
                                             showBottomSheet = false
+                                            editingTeam = -1
+                                            editingTeamName = ""
                                         }
                                     }
                                 }, modifier = Modifier
@@ -268,11 +343,88 @@ fun updateTeams(api: CVSSAPI, teams: SnapshotStateList<Team>) {
 }
 
 @Composable
+fun DeleteTeamDialog(onClose: () -> Unit, onDelete: () -> Unit, editingTeam: Int, api: CVSSAPI) {
+    var teamName by remember { mutableStateOf("Loading...") }
+
+    LaunchedEffect(Unit) {
+        thread {
+            val tn = api.getTeam(editingTeam)?.name
+            if (tn != null) {
+                teamName = tn
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(text = "Deleting team") },
+        text = { Text(text = "Are you sure, you want to delete team $teamName (#$editingTeam)?") },
+        confirmButton = {
+            TextButton(onClick = onDelete) { Text("Confirm") }
+        },
+        dismissButton = {
+            TextButton(onClick = onClose) { Text("Dismiss") }
+        }
+    )
+}
+
 @Preview(
+    name = "Dynamic Red Dark",
+    group = "dark",
     showBackground = true,
     uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL,
-    wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE,
+    wallpaper = Wallpapers.RED_DOMINATED_EXAMPLE
 )
+@Preview(
+    name = "Dynamic Green Dark",
+    group = "dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.GREEN_DOMINATED_EXAMPLE
+)
+@Preview(
+    name = "Dynamic Yellow Dark",
+    group = "dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.YELLOW_DOMINATED_EXAMPLE
+)
+@Preview(
+    name = "Dynamic Blue Dark",
+    group = "dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE
+)
+@Preview(
+    name = "Dynamic Red Light",
+    group = "light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.RED_DOMINATED_EXAMPLE
+)
+@Preview(
+    name = "Dynamic Green Light",
+    group = "light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.GREEN_DOMINATED_EXAMPLE
+)
+@Preview(
+    name = "Dynamic Yellow Light",
+    group = "light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.YELLOW_DOMINATED_EXAMPLE
+)
+@Preview(
+    name = "Dynamic Blue Light",
+    group = "light",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO or Configuration.UI_MODE_TYPE_NORMAL,
+    wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE
+)
+@Composable
 fun GreetingPreview() {
     CVSSClientTheme {
         MainUI()
