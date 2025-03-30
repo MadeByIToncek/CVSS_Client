@@ -31,6 +31,9 @@ public abstract class EventStreamWebsocketHandler extends WebSocketListener impl
     public abstract void teamUpdateEvent();
 
     public abstract void matchUpdateEvent();
+    public abstract void matchArmEvent();
+    public abstract void matchStartEvent();
+    public abstract void matchEndEvent();
 
     @Override
     public void onOpen(WebSocket webSocket, @NonNull Response response) {
@@ -40,10 +43,12 @@ public abstract class EventStreamWebsocketHandler extends WebSocketListener impl
 
     @Override
     public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
-        if (text.equals("TEAM_UPDATE_EVENT")) {
-            teamUpdateEvent();
-        } else if (text.equals("MATCH_UPDATE_EVENT")) {
-            matchUpdateEvent();
+        switch (Event.valueOf(text)) {
+            case TEAM_UPDATE_EVENT -> teamUpdateEvent();
+            case MATCH_UPDATE_EVENT -> matchUpdateEvent();
+            case MATCH_ARM -> matchArmEvent();
+            case MATCH_START -> matchStartEvent();
+            case MATCH_END -> matchEndEvent();
         }
     }
 
@@ -67,5 +72,13 @@ public abstract class EventStreamWebsocketHandler extends WebSocketListener impl
     public void close() throws IOException {
         client.dispatcher().executorService().shutdown();
         client = null;
+    }
+
+    public enum Event {
+        TEAM_UPDATE_EVENT,
+        MATCH_UPDATE_EVENT,
+        MATCH_ARM,
+        MATCH_START,
+        MATCH_END
     }
 }

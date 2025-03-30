@@ -1,5 +1,8 @@
-package space.itoncek.cvss.client
+package space.itoncek.cvss.client.prepare
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
@@ -68,9 +71,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import space.itoncek.cvss.client.PrepareNavigation
+import space.itoncek.cvss.client.PrepareSourceActivity
 import space.itoncek.cvss.client.api.CVSSAPI
 import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
 import space.itoncek.cvss.client.api.objects.Team
+import space.itoncek.cvss.client.switchToGameView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
 
@@ -109,7 +115,7 @@ fun MainUI() {
 
     ModalNavigationDrawer(
         drawerContent = {
-            GlobalNavigation(ScreenView.TeamManager, scope, drawerState, ctx)
+            PrepareNavigation(PrepareSourceActivity.TeamManager, scope, drawerState, ctx)
         },
         drawerState = drawerState
     ) {
@@ -308,7 +314,11 @@ fun MainUI() {
                 updateTeams(api, teams)
                 teamHandler = api.createEventHandler({
                     updateTeams(api, teams)
-                }, {});
+                }, {},{
+                    switchToGameView(ctx);
+                },{
+                    switchToGameView(ctx);
+                },{});
             } else if (dev) {
                 teams.clear()
                 teams.add(Team(-1, "Dev mode!"))

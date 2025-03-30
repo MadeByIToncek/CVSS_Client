@@ -165,7 +165,7 @@ public class CVSSAPI {
         }
     }
 
-    public EventStreamWebsocketHandler createEventHandler(@NotNull Runnable teamUpdateEvent, @NotNull Runnable matchUpdateEvent) {
+    public EventStreamWebsocketHandler createEventHandler(@NotNull Runnable teamUpdateEvent, @NotNull Runnable matchUpdateEvent, @NotNull Runnable matchArmEvent, @NotNull Runnable matchStartEvent, @NotNull Runnable matchEndEvent) {
         return new EventStreamWebsocketHandler(url + "/stream/event") {
             @Override
             public void teamUpdateEvent() {
@@ -175,6 +175,21 @@ public class CVSSAPI {
             @Override
             public void matchUpdateEvent() {
                 matchUpdateEvent.run();
+            }
+
+            @Override
+            public void matchArmEvent() {
+                matchArmEvent.run();
+            }
+
+            @Override
+            public void matchStartEvent() {
+                matchStartEvent.run();
+            }
+
+            @Override
+            public void matchEndEvent() {
+                matchEndEvent.run();
             }
         };
     }
@@ -220,6 +235,19 @@ public class CVSSAPI {
 
         try (Response res = client.newCall(request).execute()) {
             return res.body().string().trim().equals("ok");
+        }
+    }
+
+    public boolean armMatch(int matchId) throws IOException, JSONException {
+        Request request = new Request.Builder()
+                .url(url + "/match/arm")
+                .post(RequestBody.create(new JSONObject().put("id", matchId).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return ok.trim().equals("ok");
         }
     }
 }

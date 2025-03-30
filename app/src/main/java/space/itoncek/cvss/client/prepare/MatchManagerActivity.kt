@@ -1,5 +1,8 @@
-package space.itoncek.cvss.client
+package space.itoncek.cvss.client.prepare
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -76,10 +80,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
+import space.itoncek.cvss.client.PrepareNavigation
+import space.itoncek.cvss.client.PrepareSourceActivity
 import space.itoncek.cvss.client.api.CVSSAPI
 import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
 import space.itoncek.cvss.client.api.objects.Match
 import space.itoncek.cvss.client.api.objects.Team
+import space.itoncek.cvss.client.switchToGameView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
 
@@ -112,7 +119,7 @@ fun Greeting() {
 
     ModalNavigationDrawer(
         drawerContent = {
-            GlobalNavigation(ScreenView.MatchManager, scope, drawerState, ctx)
+            PrepareNavigation(PrepareSourceActivity.MatchManager, scope, drawerState, ctx)
         },
         drawerState = drawerState
     ) {
@@ -156,6 +163,7 @@ fun Greeting() {
             val editState = rememberModalBottomSheetState()
             val createState = rememberModalBottomSheetState()
             var showDeletionDialog by remember { mutableStateOf(false) }
+            var showStartDialog by remember { mutableStateOf(false) }
             if (showDeletionDialog) {
                 DeleteMatchDialog(
                     onClose = { showDeletionDialog = false },
@@ -166,13 +174,35 @@ fun Greeting() {
                                 runOnUiThread {
                                     Toast.makeText(
                                         ctx,
-                                        "Unable to delete that team, check if there are some matches, they are associated with!",
+                                        "Unable to delete that match!",
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
                             }
                             selectedMatchId = -1
                         }
+                    },
+                    selectedMatchId,
+                    api
+                )
+            }
+            if (showStartDialog) {
+                StartMatchDialog(
+                    onClose = { showStartDialog = false },
+                    onDelete = {
+                        showStartDialog = false
+                        thread {
+                            if (!api.armMatch(selectedMatchId)) {
+                                runOnUiThread {
+                                    Toast.makeText(
+                                        ctx,
+                                        "Unable to arm that match!",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                            selectedMatchId = -1
+                        }.join()
                     },
                     selectedMatchId,
                     api
@@ -216,6 +246,14 @@ fun Greeting() {
                             )
 
                             Spacer(modifier = Modifier.weight(1f))
+                            FilledIconButton(
+                                onClick = {
+                                    selectedMatchId = matches[match].id;
+                                    showStartDialog = true;
+                                }
+                            ) {
+                                Icon(Icons.Filled.PlayArrow, "")
+                            }
                             FilledIconButton(
                                 onClick = {
                                     selectedMatchId = matches[match].id;
@@ -884,7 +922,11 @@ fun Greeting() {
 
                     matchHandler = api.createEventHandler({}, {
                         updateMatches(api, matches)
-                    });
+                    },{
+                        switchToGameView(ctx);
+                    },{
+                        switchToGameView(ctx);
+                    },{});
                 } else if (dev) {
                     matches.clear()
                     matches.add(
@@ -947,7 +989,7 @@ fun DeleteMatchDialog(onClose: () -> Unit, onDelete: () -> Unit, editingTeam: In
 
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text(text = "Deleting team") },
+        title = { Text(text = "Deleting match") },
         text = {
             Text(
                 text = if (match == null) {
@@ -959,6 +1001,40 @@ fun DeleteMatchDialog(onClose: () -> Unit, onDelete: () -> Unit, editingTeam: In
         },
         confirmButton = {
             TextButton(onClick = onDelete) { Text("Confirm") }
+        },
+        dismissButton = {
+            TextButton(onClick = onClose) { Text("Dismiss") }
+        }
+    )
+}
+
+@Composable
+fun StartMatchDialog(onClose: () -> Unit, onDelete: () -> Unit, editingTeam: Int, api: CVSSAPI) {
+    var match by remember { mutableStateOf<Match?>(null) }
+
+    LaunchedEffect(Unit) {
+        thread {
+            val m = api.getMatch(editingTeam)
+            if (m != null) {
+                match = m
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text(text = "Arming match") },
+        text = {
+            Text(
+                text = if (match == null) {
+                    "Loading"
+                } else {
+                    "Are you sure you want to ARM match #${match!!.id} between ${match!!.left.name} and ${match!!.right.name}?"
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDelete) { Text("ARM") }
         },
         dismissButton = {
             TextButton(onClick = onClose) { Text("Dismiss") }

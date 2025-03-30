@@ -20,12 +20,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import space.itoncek.cvss.client.play.MatchMasterControlActivity
+import space.itoncek.cvss.client.prepare.MatchManagerActivity
+import space.itoncek.cvss.client.prepare.TeamManagerActivity
 
 const val serverVersion = "v0.0.0.1"
 const val devVersion = "vDEVELOPMENT"
 
 @Composable
-fun GlobalNavigation(i: ScreenView, scope: CoroutineScope, drawerState: DrawerState, ctx: Context) {
+fun PrepareNavigation(i: PrepareSourceActivity, scope: CoroutineScope, drawerState: DrawerState, ctx: Context) {
     ModalDrawerSheet {
         Column(
             modifier = Modifier
@@ -47,9 +50,9 @@ fun GlobalNavigation(i: ScreenView, scope: CoroutineScope, drawerState: DrawerSt
             )
             NavigationDrawerItem(
                 label = { Text("Teams") },
-                selected = i == ScreenView.TeamManager,
+                selected = i == PrepareSourceActivity.TeamManager,
                 onClick = {
-                    if (i != ScreenView.TeamManager) {
+                    if (i != PrepareSourceActivity.TeamManager) {
                         scope.launch { drawerState.close() }
                         ctx.startActivity(Intent(ctx, TeamManagerActivity::class.java))
                         (ctx as Activity).finish()
@@ -58,63 +61,80 @@ fun GlobalNavigation(i: ScreenView, scope: CoroutineScope, drawerState: DrawerSt
             )
             NavigationDrawerItem(
                 label = { Text("Matches") },
-                selected = i == ScreenView.MatchManager,
+                selected = i == PrepareSourceActivity.MatchManager,
                 onClick = {
-                    if (i != ScreenView.MatchManager) {
+                    if (i != PrepareSourceActivity.MatchManager) {
                         scope.launch { drawerState.close() }
                         ctx.startActivity(Intent(ctx, MatchManagerActivity::class.java))
                         (ctx as Activity).finish()
                     }
                 }
             )
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        }
+    }
+}
+@Composable
+fun PlayNavigation(i: PlaySourceActivity, scope: CoroutineScope, drawerState: DrawerState, ctx: Context) {
+    ModalDrawerSheet {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "CVSS Client",
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.titleLarge
+            )
+            HorizontalDivider()
 
             Text(
-                "Playing",
+                "In Game",
                 modifier = Modifier.padding(16.dp),
                 style = MaterialTheme.typography.titleMedium
             )
             NavigationDrawerItem(
-                label = { Text("Setup next game") },
-                selected = i == ScreenView.GameSetup,
+                label = { Text("Master control") },
+                selected = i == PlaySourceActivity.MatchMasterControl,
                 onClick = {
-                    if (i != ScreenView.GameSetup) {
+                    if (i != PlaySourceActivity.MatchMasterControl) {
                         scope.launch { drawerState.close() }
-                        ctx.startActivity(
-                            Intent(
-                                ctx, /*TODO)) Replace*/
-                                SetupNextGameActivity::class.java
-                            )
-                        )
+                        ctx.startActivity(Intent(ctx, MatchMasterControlActivity::class.java))
                         (ctx as Activity).finish()
                     }
                 }
             )
             NavigationDrawerItem(
-                label = { Text("Game scoring") },
-                selected = i == ScreenView.GameScoring,
+                label = { Text("Scoring") },
+                selected = i == PlaySourceActivity.ScoringControl,
                 onClick = {
-                    if (i != ScreenView.GameScoring) {
+                    if (i != PlaySourceActivity.ScoringControl) {
                         scope.launch { drawerState.close() }
-                        ctx.startActivity(
-                            Intent(
-                                ctx, /*TODO)) Replace*/
-                                MatchManagerActivity::class.java
-                            )
-                        )
+                        ctx.startActivity(Intent(ctx, MatchManagerActivity::class.java))
                         (ctx as Activity).finish()
                     }
                 }
             )
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
-enum class ScreenView {
+fun switchToGameView(ctx: Context) {
+    ctx.startActivity(Intent(ctx,MatchMasterControlActivity::class.java))
+    (ctx as? Activity)?.finish()
+}
+
+fun switchToPrepareView(ctx: Context) {
+    ctx.startActivity(Intent(ctx,TeamManagerActivity::class.java))
+    (ctx as? Activity)?.finish()
+}
+
+enum class PrepareSourceActivity {
     TeamManager,
-    MatchManager,
-    GameSetup,
-    GameScoring
+    MatchManager
+}
+enum class PlaySourceActivity {
+    MatchMasterControl,
+    ScoringControl
 }
