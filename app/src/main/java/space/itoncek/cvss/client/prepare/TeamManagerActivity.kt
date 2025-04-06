@@ -1,8 +1,5 @@
 package space.itoncek.cvss.client.prepare
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
@@ -29,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -65,20 +63,22 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.Wallpapers
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import space.itoncek.cvss.client.PrepareNavigation
-import space.itoncek.cvss.client.PrepareSourceActivity
+import space.itoncek.cvss.client.GenerateNavigation
+import space.itoncek.cvss.client.SourceActivity
 import space.itoncek.cvss.client.api.CVSSAPI
 import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
 import space.itoncek.cvss.client.api.objects.Team
+import space.itoncek.cvss.client.determineRightScreen
+import space.itoncek.cvss.client.runOnUiThread
 import space.itoncek.cvss.client.switchToGameView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
+import androidx.core.graphics.toColorInt
 
 class TeamManagerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,11 +92,10 @@ class TeamManagerActivity : ComponentActivity() {
     }
 }
 
-fun runOnUiThread(block: suspend () -> Unit) = CoroutineScope(Dispatchers.Main).launch { block() }
 
 
-var teamHandler: EventStreamWebsocketHandler? = null
-
+private var eventStream: EventStreamWebsocketHandler? = null
+// TODO)) Add team color modification!
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainUI() {
@@ -108,14 +107,13 @@ fun MainUI() {
     val scope = rememberCoroutineScope()
     var showBottomSheet by remember { mutableStateOf(false) }
     var createInsteadOfEdit by remember { mutableStateOf(false) }
-    var editingTeam by remember { mutableIntStateOf(-1) }
-    var editingTeamName by remember { mutableStateOf("") }
+    var selectedTeam by remember { mutableIntStateOf(-1) }
     val sheetState = rememberModalBottomSheetState()
     var showDeletionDialog by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
         drawerContent = {
-            PrepareNavigation(PrepareSourceActivity.TeamManager, scope, drawerState, ctx)
+            GenerateNavigation(SourceActivity.TeamManager, scope, drawerState, ctx)
         },
         drawerState = drawerState
     ) {
@@ -149,7 +147,6 @@ fun MainUI() {
                 FloatingActionButton(
                     onClick = {
                         createInsteadOfEdit = true
-                        editingTeamName = ""
                         showBottomSheet = true
                     },
                 ) {
@@ -163,7 +160,7 @@ fun MainUI() {
                     onDelete = {
                         showDeletionDialog = false
                         thread {
-                            if (!api.deleteTeam(editingTeam)) {
+                            if (!api.deleteTeam(selectedTeam)) {
                                 runOnUiThread {
                                     Toast.makeText(
                                         ctx,
@@ -172,10 +169,10 @@ fun MainUI() {
                                     ).show()
                                 }
                             }
-                            editingTeam = -1
+                            selectedTeam = -1
                         }
                     },
-                    editingTeam,
+                    selectedTeam,
                     api
                 )
             }
@@ -197,8 +194,8 @@ fun MainUI() {
                             )
                             .wrapContentHeight(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.primary
+                            containerColor = getColorFromString("#"+teams[team].colorDark),
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     ) {
                         Row(
@@ -213,7 +210,7 @@ fun MainUI() {
                             Spacer(modifier = Modifier.weight(1f))
                             FilledIconButton(
                                 onClick = {
-                                    editingTeam = teams[team].id;
+                                    selectedTeam = teams[team].id;
                                     showDeletionDialog = true;
                                 }
                             ) {
@@ -222,8 +219,7 @@ fun MainUI() {
                             FilledIconButton(onClick = {
                                 createInsteadOfEdit = false
                                 showBottomSheet = true
-                                editingTeam = teams[team].id;
-                                editingTeamName = teams[team].name;
+                                selectedTeam = teams[team].id;
                             }) {
                                 Icon(Icons.Filled.Edit, "")
                             }
@@ -231,12 +227,13 @@ fun MainUI() {
                     }
                 }
             }
-
+            var requestFailed by remember { mutableStateOf(false) }
             if (showBottomSheet) {
                 ModalBottomSheet(
                     onDismissRequest = {
                         showBottomSheet = false
-                    }, sheetState = sheetState
+                    }, sheetState = sheetState,
+                    containerColor = if (requestFailed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer
                 ) {
                     Column(
                         modifier = Modifier
@@ -245,58 +242,135 @@ fun MainUI() {
                             .wrapContentHeight(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        var teamName by remember { mutableStateOf(editingTeamName) }
-                        TextField(teamName,
-                            onValueChange = {
-                                teamName = it
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = {
-                                Text("Team name", color = Color.Gray)
-                            })
-                        Row {
-                            Button(
-                                onClick = {
-                                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                        if (!sheetState.isVisible) {
-                                            showBottomSheet = false
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth(.4f)
-                                    .padding(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Text("Cancel")
-                            }
-                            Button(
-                                onClick = {
-                                    thread {
-                                        if (createInsteadOfEdit) {
-                                            api.createTeam(teamName)
-                                        } else {
-                                            api.updateTeam(editingTeam, teamName)
-                                        }
-                                    }.join()
-                                    updateTeams(api, teams)
+                        var loading by remember { mutableStateOf(true) }
+                        var teamName by remember { mutableStateOf("") }
+                        var teamColorBright by remember { mutableStateOf("") }
+                        var teamColorDark by remember { mutableStateOf("") }
 
-                                    scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                        if (!sheetState.isVisible) {
-                                            createInsteadOfEdit = false
-                                            showBottomSheet = false
-                                            editingTeam = -1
-                                            editingTeamName = ""
+                        LaunchedEffect(showBottomSheet) {
+                            if (showBottomSheet) {
+                                thread {
+                                    teams.clear()
+                                    val teamss = api.listTeams();
+                                    if (teamss == null) {
+                                        requestFailed = true
+                                        runOnUiThread {
+                                            Toast.makeText(
+                                                ctx,
+                                                "Unable to load the teams",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
+                                        return@thread
+                                    } else teamss.forEach {
+                                        teams.add(it);
                                     }
-                                }, modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp)
-                            ) {
-                                Text("Save")
+
+                                    if(!createInsteadOfEdit) {
+                                        val team = api.getTeam(selectedTeam);
+                                        if (team != null) {
+                                            requestFailed = false;
+                                            teamName = team.name;
+                                            teamColorBright = team.colorDark;
+                                            loading = false
+                                            return@thread
+                                        } else {
+                                            requestFailed = true
+                                            Toast.makeText(
+                                                ctx,
+                                                "Unable to load the match",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    } else {
+                                        requestFailed = false;
+                                        loading=false;
+                                    }
+                                }.join()
+                            }
+                        }
+                        if(loading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.secondary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            Text("Loading", modifier = Modifier
+                                .padding(8.dp)
+                                .padding(bottom = 16.dp))
+                        } else if(requestFailed) {
+                            Text("Request failed!", fontSize = 32.sp, color =  MaterialTheme.colorScheme.onErrorContainer)
+                            Text("Please check your connectivity & server logs for more info.")
+                        } else {
+                            TextField(
+                                teamName,
+                                onValueChange = {
+                                    teamName = it
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text("Team name", color = Color.Gray)
+                                })
+                            TextField(
+                                teamColorBright,
+                                onValueChange = {
+                                    teamColorBright = it
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text("Team color", color = Color.Gray)
+                                })
+                            TextField(
+                                teamColorDark,
+                                onValueChange = {
+                                    teamColorDark = it
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text("Team color", color = Color.Gray)
+                                })
+                            Row {
+                                Button(
+                                    onClick = {
+                                        scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                            if (!sheetState.isVisible) {
+                                                showBottomSheet = false
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth(.4f)
+                                        .padding(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text("Cancel")
+                                }
+                                Button(
+                                    onClick = {
+                                        thread {
+                                            if (createInsteadOfEdit) {
+                                                api.createTeam(teamName, teamColorBright,teamColorDark )
+                                            } else {
+                                                api.updateTeam(selectedTeam, teamName,teamColorBright,teamColorDark)
+                                            }
+                                        }.join()
+                                        updateTeams(api, teams)
+
+                                        scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                            if (!sheetState.isVisible) {
+                                                createInsteadOfEdit = false
+                                                showBottomSheet = false
+                                                selectedTeam = -1
+                                            }
+                                        }
+                                    }, modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp)
+                                ) {
+                                    Text("Save")
+                                }
                             }
                         }
                     }
@@ -311,28 +385,62 @@ fun MainUI() {
     DisposableEffect(LocalContext.current) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START && !dev) {
-                updateTeams(api, teams)
-                teamHandler = api.createEventHandler({
-                    updateTeams(api, teams)
-                }, {},{
-                    switchToGameView(ctx);
-                },{
-                    switchToGameView(ctx);
-                },{});
+                thread {
+                    if (determineRightScreen(api).contains(SourceActivity.TeamManager)) {
+                        updateTeams(api, teams)
+                        eventStream = api.createEventHandler(
+                            { e->
+                                if(e == null) return@createEventHandler
+                                when (e) {
+                                    EventStreamWebsocketHandler.Event.TEAM_UPDATE_EVENT -> {
+                                        updateTeams(api, teams)
+                                    }
+                                    EventStreamWebsocketHandler.Event.MATCH_UPDATE_EVENT -> {}
+                                    EventStreamWebsocketHandler.Event.MATCH_ARM -> {
+                                        switchToGameView(ctx)
+                                    }
+                                    EventStreamWebsocketHandler.Event.MATCH_RESET -> {}
+                                    EventStreamWebsocketHandler.Event.MATCH_START -> {
+                                        switchToGameView(ctx)
+                                    }
+                                    EventStreamWebsocketHandler.Event.MATCH_RECYCLE -> {
+                                        switchToGameView(ctx)
+                                    }
+                                    EventStreamWebsocketHandler.Event.MATCH_END -> {}
+                                }
+                            },
+                            { s ->
+                                Toast.makeText(
+                                    ctx,
+                                    "Event stream failed! $s",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                eventStream?.close()
+                            })
+                    } else {
+                        switchToGameView(ctx)
+                    }
+                }
             } else if (dev) {
                 teams.clear()
-                teams.add(Team(-1, "Dev mode!"))
-                teams.add(Team(-2, "Dev mode!"))
-                teams.add(Team(-3, "Dev mode!"))
+                teams.add(Team(-1, "Dev mode!", "000000","000000"))
+                teams.add(Team(-2, "Dev mode!", "000000","000000"))
+                teams.add(Team(-3, "Dev mode!", "000000","000000"))
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
-            teamHandler?.close();
+            eventStream?.close();
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
+}
+
+fun getColorFromString(color: String): Color {
+    val c = color.toColorInt()
+
+    return Color(c)
 }
 
 fun updateTeams(api: CVSSAPI, teams: SnapshotStateList<Team>) {
@@ -346,7 +454,7 @@ fun updateTeams(api: CVSSAPI, teams: SnapshotStateList<Team>) {
                 teams.addAll(t)
             } else {
                 teams.clear()
-                teams.add(Team(-1, "CONNECTION ERROR!"))
+                teams.add(Team(-1, "CONNECTION ERROR!", "000000","000000"))
             }
         }
     }.join()

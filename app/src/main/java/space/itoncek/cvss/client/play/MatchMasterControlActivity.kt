@@ -2,6 +2,8 @@ package space.itoncek.cvss.client.play
 
 import android.content.res.Configuration
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,7 +31,11 @@ import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,17 +49,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
 import space.itoncek.cvss.client.AutoSizeText
-import space.itoncek.cvss.client.PlayNavigation
-import space.itoncek.cvss.client.PlaySourceActivity
-import space.itoncek.cvss.client.PrepareNavigation
-import space.itoncek.cvss.client.PrepareSourceActivity
+import space.itoncek.cvss.client.GenerateNavigation
+import space.itoncek.cvss.client.SourceActivity
 import space.itoncek.cvss.client.api.CVSSAPI
-import space.itoncek.cvss.client.api.objects.Team
-import space.itoncek.cvss.client.prepare.teamHandler
-import space.itoncek.cvss.client.prepare.updateTeams
-import space.itoncek.cvss.client.switchToGameView
+import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
+import space.itoncek.cvss.client.api.TimeStreamWebsocketHandler
+import space.itoncek.cvss.client.determineRightScreen
 import space.itoncek.cvss.client.switchToPrepareView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
+import kotlin.concurrent.thread
 
 class MatchMasterControlActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,6 +71,9 @@ class MatchMasterControlActivity : ComponentActivity() {
     }
 }
 
+private var eventStream: EventStreamWebsocketHandler? = null
+private var timeStream: TimeStreamWebsocketHandler? = null
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MatchMasterControl() {
@@ -76,9 +83,10 @@ fun MatchMasterControl() {
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
+    var time by remember { mutableIntStateOf(0) }
     ModalNavigationDrawer(
         drawerContent = {
-            PlayNavigation(PlaySourceActivity.MatchMasterControl, scope, drawerState, ctx)
+            GenerateNavigation(SourceActivity.MatchMasterControl, scope, drawerState, ctx)
         },
         drawerState = drawerState
     ) {
@@ -115,10 +123,17 @@ fun MatchMasterControl() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Button(onClick = {}, modifier = Modifier.fillMaxWidth(.485f)) {
+                    Button(onClick = {
+                        thread {
+                            api.startMatch();
+                        }
+                    }, modifier = Modifier.fillMaxWidth(.485f)) {
                         Text("Start game")
                     }
-                    Button(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = {
+                        thread {
+                            api.resetMatch();
+                        }}, modifier = Modifier.fillMaxWidth()) {
                         Text("Abort game")
                     }
                 }
@@ -183,13 +198,58 @@ fun MatchMasterControl() {
         DisposableEffect(LocalContext.current) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_START && !dev) {
-                    teamHandler = api.createEventHandler({}, {},{},{},{ switchToPrepareView(ctx)});
+
+                    thread {
+                        if (determineRightScreen(
+                                api
+                            ).contains(SourceActivity.MatchMasterControl)
+                        ) {
+                            eventStream =
+                                api.createEventHandler(
+                                    { e->
+                                        if(e == null) return@createEventHandler
+                                        when (e) {
+                                            EventStreamWebsocketHandler.Event.TEAM_UPDATE_EVENT -> {}
+                                            EventStreamWebsocketHandler.Event.MATCH_UPDATE_EVENT -> {}
+                                            EventStreamWebsocketHandler.Event.MATCH_ARM -> {}
+                                            EventStreamWebsocketHandler.Event.MATCH_RESET -> {
+                                                switchToPrepareView(ctx);
+                                            }
+                                            EventStreamWebsocketHandler.Event.MATCH_START -> {}
+                                            EventStreamWebsocketHandler.Event.MATCH_RECYCLE -> {}
+                                            EventStreamWebsocketHandler.Event.MATCH_END -> {
+                                                switchToPrepareView(ctx);
+                                            }
+                                        }
+                                    },
+                                    { s ->
+                                        Toast.makeText(
+                                            ctx,
+                                            "Event stream failed! $s",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                        eventStream?.close();
+                                    });
+                            timeStream =
+                                api.createTimeHandler({ t ->
+                                    time = t
+                                }, { s ->
+                                    Toast.makeText(ctx, "Time stream failed! $s", Toast.LENGTH_LONG)
+                                        .show()
+                                    eventStream?.close();
+                                });
+                            time = api.getMatchLength();
+                            Log.i("debdeb", time.toString())
+                        } else {
+                            switchToPrepareView(ctx)
+                        }
+                    }
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
 
             onDispose {
-                teamHandler?.close();
+                eventStream?.close();
                 lifecycleOwner.lifecycle.removeObserver(observer)
             }
         }

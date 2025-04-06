@@ -5,4 +5,5 @@
     <string name="title_activity_setup_next_game">SetupNextGameActivity</string>
     <string name="title_activity_match_arm">MatchArmActivity</string>
     <string name="title_activity_score_control">ScoreControlActivity</string>
+    <string name="title_activity_overlay_control">OverlayControlActivity</string>
 </resources>

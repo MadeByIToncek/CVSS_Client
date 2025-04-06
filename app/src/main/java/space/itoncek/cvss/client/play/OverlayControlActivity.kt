@@ -7,15 +7,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,7 +30,7 @@ import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,6 +41,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.Wallpapers
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -51,13 +55,13 @@ import space.itoncek.cvss.client.switchToPrepareView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
 
-class ScoreControlActivity : ComponentActivity() {
+class OverlayControlActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             CVSSClientTheme {
-                ScoreControl()
+                OverlayControl()
             }
         }
     }
@@ -67,17 +71,17 @@ private var eventStream: EventStreamWebsocketHandler? = null
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScoreControl() {
+fun OverlayControl() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val ctx = LocalContext.current;
     val api = CVSSAPI(ctx.filesDir);
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    var field by remember { mutableStateOf(false)}
+
 
     ModalNavigationDrawer(
         drawerContent = {
-            GenerateNavigation(SourceActivity.ScoringControl, scope, drawerState, ctx)
+            GenerateNavigation(SourceActivity.OverlayControl, scope, drawerState, ctx)
         },
         drawerState = drawerState
     ) {
@@ -92,7 +96,7 @@ fun ScoreControl() {
                         titleContentColor = MaterialTheme.colorScheme.primary,
                     ),
                     title = {
-                        Text("Match score control")
+                        Text("Overlay")
                     },
                     navigationIcon = {
                         IconButton(
@@ -104,24 +108,101 @@ fun ScoreControl() {
                         ) {
                             Icon(Icons.Filled.Menu, "menu")
                         }
-                    },
-                    actions = {
-                        Row(Modifier.padding(8.dp)) {
-                            IconButton(onClick = {
-                                field = false
-                            }, enabled = field) {
-                                Icon(Icons.Filled.ArrowBack, "Switch to left field")
-                            }
-                            IconButton(onClick = {
-                                field = true
-                            }, enabled = !field) {
-                                Icon(Icons.Filled.ArrowForward, "Switch to right field")
-                            }
-                        }
                     }
                 )
             }
         ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(8.dp)
+            ) {
+                Text(
+                    "Left team lower third",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    fontSize = 20.sp
+                )
+                Row {
+                    Button(
+                        {
+                            thread { api.toggleOverlay(CVSSAPI.OverlayPart.Left, true); }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth(.49f)
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text("Enable")
+                    }
+                    Button(
+                        {
+                            thread { api.toggleOverlay(CVSSAPI.OverlayPart.Left, false); }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text("Disable")
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                Text(
+                    "Right team lower third",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    fontSize = 20.sp
+                )
+                Row {
+                    Button(
+                        {
+                            thread { api.toggleOverlay(CVSSAPI.OverlayPart.Right, true); }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth(.49f)
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text("Enable")
+                    }
+                    Button(
+                        {
+                            thread { api.toggleOverlay(CVSSAPI.OverlayPart.Right, false); }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text("Disable")
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+                Text(
+                    "Timer",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                    fontSize = 20.sp
+                )
+                Row {
+                    Button(
+                        {
+                            thread { api.toggleOverlay(CVSSAPI.OverlayPart.Timer, true); }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth(.49f)
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text("Enable")
+                    }
+                    Button(
+                        {
+                            thread { api.toggleOverlay(CVSSAPI.OverlayPart.Timer, false); }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Text("Disable")
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(top = 8.dp))
+            }
         }
         val dev = LocalInspectionMode.current;
         DisposableEffect(LocalContext.current) {
@@ -131,12 +212,12 @@ fun ScoreControl() {
                     thread {
                         if (determineRightScreen(
                                 api
-                            ).contains(SourceActivity.ScoringControl)
+                            ).contains(SourceActivity.OverlayControl)
                         ) {
                             eventStream =
                                 api.createEventHandler(
-                                    { e->
-                                        if(e == null) return@createEventHandler
+                                    { e ->
+                                        if (e == null) return@createEventHandler
                                         when (e) {
                                             EventStreamWebsocketHandler.Event.TEAM_UPDATE_EVENT -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_UPDATE_EVENT -> {}
@@ -144,6 +225,7 @@ fun ScoreControl() {
                                             EventStreamWebsocketHandler.Event.MATCH_RESET -> {
                                                 switchToPrepareView(ctx);
                                             }
+
                                             EventStreamWebsocketHandler.Event.MATCH_START -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_RECYCLE -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_END -> {
@@ -174,7 +256,6 @@ fun ScoreControl() {
         }
     }
 }
-
 @Preview(
     name = "Dynamic Red Dark",
     group = "dark",
@@ -232,8 +313,8 @@ fun ScoreControl() {
     wallpaper = Wallpapers.BLUE_DOMINATED_EXAMPLE
 )
 @Composable
-fun GreetingPreview3() {
+fun OverlayControlPreview() {
     CVSSClientTheme {
-        ScoreControl()
+        OverlayControl()
     }
 }

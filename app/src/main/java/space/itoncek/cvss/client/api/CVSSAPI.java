@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.util.function.Consumer;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -55,7 +56,7 @@ public class CVSSAPI {
             long mid = Long.parseLong(execute.body().string());
             execute.close();
             return ((mid - start) + (end - mid)) / 2L;
-        } catch (IOException e) {
+        } catch (Exception e) {
             return -1;
         }
     }
@@ -84,7 +85,7 @@ public class CVSSAPI {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
 
-                at.add(new Team(o.getInt("id"), o.getString("name")));
+                at.add(new Team(o.getInt("id"), o.getString("name"), o.getString("colorDark"), o.getString("colorBright")));
             }
             return at;
         } catch (IOException e) {
@@ -92,8 +93,13 @@ public class CVSSAPI {
         }
     }
 
-    public void updateTeam(int teamId, @NotNull String teamName) throws JSONException, IOException {
-        Request request = new Request.Builder().patch(RequestBody.create(new JSONObject().put("id", teamId).put("name", teamName).toString(4), MediaType.parse("application/json"))).url(url + "/teams/team").build();
+    public void updateTeam(int teamId, @NotNull String teamName, @NotNull String colorBright, @NotNull String colorDark) throws JSONException, IOException {
+        Request request = new Request.Builder().patch(RequestBody.create(new JSONObject()
+                .put("id", teamId)
+                .put("name", teamName)
+                .put("colorBright", colorBright)
+                .put("colorDark", colorDark)
+                .toString(4), MediaType.parse("application/json"))).url(url + "/teams/team").build();
 
         try (Response res = client.newCall(request).execute()) {
             if (!res.body().string().trim().equals("ok")) {
@@ -128,7 +134,7 @@ public class CVSSAPI {
         try (Response res = client.newCall(request).execute()) {
             if (res.body() == null) return null;
             JSONObject o = new JSONObject(res.body().string());
-            return new Team(o.getInt("id"), o.getString("name"));
+            return new Team(o.getInt("id"), o.getString("name"), o.getString("colorDark"), o.getString("colorBright"));
         }
     }
 
@@ -165,31 +171,42 @@ public class CVSSAPI {
         }
     }
 
-    public EventStreamWebsocketHandler createEventHandler(@NotNull Runnable teamUpdateEvent, @NotNull Runnable matchUpdateEvent, @NotNull Runnable matchArmEvent, @NotNull Runnable matchStartEvent, @NotNull Runnable matchEndEvent) {
+    public EventStreamWebsocketHandler createEventHandler(@NotNull Consumer<EventStreamWebsocketHandler.Event> handleEvent,
+                                                          @NotNull Consumer<String> wsFail) {
         return new EventStreamWebsocketHandler(url + "/stream/event") {
+
             @Override
-            public void teamUpdateEvent() {
-                teamUpdateEvent.run();
+            public void handleEvent(Event e) {
+                handleEvent.accept(e);
             }
 
             @Override
-            public void matchUpdateEvent() {
-                matchUpdateEvent.run();
+            public void wsFail(String reason) {
+                wsFail.accept(reason);
+            }
+        };
+    }
+
+    public TimeStreamWebsocketHandler createTimeHandler(@NotNull Consumer<Integer> timeTick, @NotNull Consumer<String> wsFail) {
+        return new TimeStreamWebsocketHandler(url + "/stream/time") {
+            @Override
+            public void timeTick(int i) {
+                timeTick.accept(i);
             }
 
             @Override
-            public void matchArmEvent() {
-                matchArmEvent.run();
+            public void gameStart() {
+
             }
 
             @Override
-            public void matchStartEvent() {
-                matchStartEvent.run();
+            public void gameEnd() {
+
             }
 
             @Override
-            public void matchEndEvent() {
-                matchEndEvent.run();
+            public void wsFail(String reason) {
+                wsFail.accept(reason);
             }
         };
     }
@@ -216,10 +233,14 @@ public class CVSSAPI {
         }
     }
 
-    public boolean createTeam(@NotNull String teamName) throws IOException, JSONException {
+    public boolean createTeam(@NotNull String teamName,@NotNull String colorBright,@NotNull String colorDark) throws IOException, JSONException {
         Request request = new Request.Builder()
                 .url(url + "/teams/team")
-                .post(RequestBody.create(new JSONObject().put("name", teamName).toString(4), MediaType.parse("application/json")))
+                .post(RequestBody.create(new JSONObject()
+                        .put("name", teamName)
+                        .put("colorBright", colorBright)
+                        .put("colorDark", colorDark)
+                        .toString(4), MediaType.parse("application/json")))
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
@@ -249,5 +270,95 @@ public class CVSSAPI {
             Log.i("debdeb", ok);
             return ok.trim().equals("ok");
         }
+    }
+
+    public boolean isInGame() throws IOException {
+        Request request = new Request.Builder()
+                .url(url + "/match/matchInProgress")
+                .get()
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return Boolean.parseBoolean(ok);
+        }
+    }
+
+    public boolean isArmed() throws IOException {
+        Request request = new Request.Builder()
+                .url(url + "/match/matchArmed")
+                .get()
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return Boolean.parseBoolean(ok);
+        }
+    }
+
+    public boolean startMatch() throws IOException {
+        Request request = new Request.Builder()
+                .url(url + "/match/start")
+                .post(RequestBody.create("", MediaType.get("text/plain")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return ok.trim().equals("ok");
+        }
+    }
+
+    public boolean toggleOverlay(OverlayPart part, boolean state) throws IOException {
+        String target = "/overlay/";
+        target += switch (part) {
+            case Left -> "left/";
+            case Right -> "right/";
+            case Timer -> "timer/";
+        };
+        target += state ? "show" : "hide";
+
+        Request request = new Request.Builder()
+                .url(url + target)
+                .put(RequestBody.create("", MediaType.get("text/plain")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return ok.trim().equals("ok");
+        }
+    }
+
+    public boolean resetMatch() throws IOException {
+        Request request = new Request.Builder()
+                .url(url + "/match/reset")
+                .post(RequestBody.create("", MediaType.get("text/plain")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return ok.trim().equals("ok");
+        }
+    }
+
+    public int getMatchLength() throws IOException {
+        Request request = new Request.Builder().url(url + "/defaultMatchLength").get().build();
+
+        try (Response res = client.newCall(request).execute()) {
+            if(res.code() == 200) {
+                assert res.body() != null;
+                return Integer.parseInt(res.body().string());
+            } else return -1;
+        }
+    }
+
+    public enum OverlayPart {
+        Left,
+        Right,
+        Timer
     }
 }

@@ -1,8 +1,5 @@
 package space.itoncek.cvss.client.prepare
 
-import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
@@ -35,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +66,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Brush.Companion.horizontalGradient
+import androidx.compose.ui.graphics.Color.Companion.Blue
+import androidx.compose.ui.graphics.Color.Companion.Green
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -75,18 +77,22 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.Wallpapers
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
-import space.itoncek.cvss.client.PrepareNavigation
-import space.itoncek.cvss.client.PrepareSourceActivity
+import space.itoncek.cvss.client.GenerateNavigation
+import space.itoncek.cvss.client.SourceActivity
 import space.itoncek.cvss.client.api.CVSSAPI
 import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
 import space.itoncek.cvss.client.api.objects.Match
 import space.itoncek.cvss.client.api.objects.Team
+import space.itoncek.cvss.client.determineRightScreen
+import space.itoncek.cvss.client.runOnUiThread
 import space.itoncek.cvss.client.switchToGameView
+import space.itoncek.cvss.client.switchToPrepareView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
 
@@ -102,7 +108,7 @@ class MatchManagerActivity : ComponentActivity() {
     }
 }
 
-var matchHandler: EventStreamWebsocketHandler? = null
+private var eventStream: EventStreamWebsocketHandler? = null
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,7 +125,7 @@ fun Greeting() {
 
     ModalNavigationDrawer(
         drawerContent = {
-            PrepareNavigation(PrepareSourceActivity.MatchManager, scope, drawerState, ctx)
+            GenerateNavigation(SourceActivity.MatchManager, scope, drawerState, ctx)
         },
         drawerState = drawerState
     ) {
@@ -230,43 +236,51 @@ fun Greeting() {
                             contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                                .wrapContentHeight(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "%s x %s (%d)".format(
-                                    matches[match].left.name,
-                                    matches[match].right.name,
-                                    matches[match].id
-                                )
+                        val g = horizontalGradient(
+                            colors = listOf(
+                                getColorFromString("#" + matches[match].left.colorDark),
+                                getColorFromString("#" + matches[match].right.colorDark)
                             )
+                        )
+                        Box(modifier = Modifier.background(brush = g)) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth()
+                                    .wrapContentHeight(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "%s x %s (%d)".format(
+                                        matches[match].left.name,
+                                        matches[match].right.name,
+                                        matches[match].id
+                                    )
+                                )
 
-                            Spacer(modifier = Modifier.weight(1f))
-                            FilledIconButton(
-                                onClick = {
-                                    selectedMatchId = matches[match].id;
-                                    showStartDialog = true;
+                                Spacer(modifier = Modifier.weight(1f))
+                                FilledIconButton(
+                                    onClick = {
+                                        selectedMatchId = matches[match].id;
+                                        showStartDialog = true;
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.PlayArrow, "")
                                 }
-                            ) {
-                                Icon(Icons.Filled.PlayArrow, "")
-                            }
-                            FilledIconButton(
-                                onClick = {
-                                    selectedMatchId = matches[match].id;
-                                    showDeletionDialog = true;
+                                FilledIconButton(
+                                    onClick = {
+                                        selectedMatchId = matches[match].id;
+                                        showDeletionDialog = true;
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.Delete, "")
                                 }
-                            ) {
-                                Icon(Icons.Filled.Delete, "")
-                            }
-                            FilledIconButton(onClick = {
-                                selectedMatchId = matches[match].id;
-                                showMatchEdit = true
-                            }) {
-                                Icon(Icons.Filled.Edit, "")
+                                FilledIconButton(onClick = {
+                                    selectedMatchId = matches[match].id;
+                                    showMatchEdit = true
+                                }) {
+                                    Icon(Icons.Filled.Edit, "")
+                                }
                             }
                         }
                     }
@@ -314,7 +328,18 @@ fun Greeting() {
                                 }.join()
                             }
                         }
-                        if (ready) {
+
+                        if (!ready) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.secondary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            Text(
+                                "Loading", modifier = Modifier
+                                    .padding(8.dp)
+                                    .padding(bottom = 16.dp)
+                            )
+                        } else {
                             Row(
                                 modifier = Modifier
                                     .padding(
@@ -366,9 +391,10 @@ fun Greeting() {
                                                     // the DropDown the same width
                                                     mTextFieldSize = coordinates.size.toSize()
                                                 },
-                                            label = { Text("Label") },
+                                            label = { Text("Left team") },
                                             trailingIcon = {
-                                                Icon(icon, "contentDescription",
+                                                Icon(
+                                                    icon, "contentDescription",
                                                     Modifier.clickable { mExpanded = !mExpanded })
                                             }
                                         )
@@ -394,7 +420,7 @@ fun Greeting() {
                                 }
 
 
-                                // Left team dropdown
+                                // Right team dropdown
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -433,9 +459,10 @@ fun Greeting() {
                                                     // the DropDown the same width
                                                     mTextFieldSize = coordinates.size.toSize()
                                                 },
-                                            label = { Text("Label") },
+                                            label = { Text("Right team") },
                                             trailingIcon = {
-                                                Icon(icon, "contentDescription",
+                                                Icon(
+                                                    icon, "contentDescription",
                                                     Modifier.clickable { mExpanded = !mExpanded })
                                             }
                                         )
@@ -532,13 +559,16 @@ fun Greeting() {
                 }
             }
 
+            var requestFailed by remember { mutableStateOf(false) }
+
             if (showMatchEdit) {
                 showMatchCreate = false
                 ModalBottomSheet(
                     onDismissRequest = {
                         showMatchEdit = false
                     },
-                    sheetState = editState
+                    sheetState = editState,
+                    containerColor = if (requestFailed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer
                 ) {
 
                     Column(
@@ -552,7 +582,6 @@ fun Greeting() {
                         var result by remember { mutableStateOf(Match.Result.NULL) }
                         var leftTeamId by remember { mutableIntStateOf(-1) }
                         var rightTeamId by remember { mutableIntStateOf(-1) }
-                        var requestFailed by remember { mutableStateOf(false) }
                         var loading by remember { mutableStateOf(true) }
                         val teams = remember { mutableStateListOf<Team>() }
 
@@ -592,7 +621,24 @@ fun Greeting() {
                                 }.join()
                             }
                         }
-                        if (!loading) {
+                        if (loading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.secondary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            Text(
+                                "Loading", modifier = Modifier
+                                    .padding(8.dp)
+                                    .padding(bottom = 16.dp)
+                            )
+                        } else if (requestFailed) {
+                            Text(
+                                "Request failed!",
+                                fontSize = 32.sp,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text("Please check your connectivity & server logs for more info.")
+                        } else {
                             // State dropdown
                             Box(
                                 modifier = Modifier.padding(
@@ -628,9 +674,10 @@ fun Greeting() {
                                                 // the DropDown the same width
                                                 mTextFieldSize = coordinates.size.toSize()
                                             },
-                                        label = { Text("Label") },
+                                        label = { Text("Match state") },
                                         trailingIcon = {
-                                            Icon(icon, "contentDescription",
+                                            Icon(
+                                                icon, "contentDescription",
                                                 Modifier.clickable { mExpanded = !mExpanded })
                                         }
                                     )
@@ -689,9 +736,10 @@ fun Greeting() {
                                                 // the DropDown the same width
                                                 mTextFieldSize = coordinates.size.toSize()
                                             },
-                                        label = { Text("Label") },
+                                        label = { Text("Match result") },
                                         trailingIcon = {
-                                            Icon(icon, "contentDescription",
+                                            Icon(
+                                                icon, "contentDescription",
                                                 Modifier.clickable { mExpanded = !mExpanded })
                                         }
                                     )
@@ -751,10 +799,10 @@ fun Greeting() {
                                         // with icon and not expanded
                                         OutlinedTextField(
                                             value = teams.first {
-                                                it.id == rightTeamId
+                                                it.id == leftTeamId
                                             }.name,
                                             onValueChange = { value ->
-                                                rightTeamId = teams.first { team ->
+                                                leftTeamId = teams.first { team ->
                                                     value == team.name
                                                 }.id
                                             },
@@ -765,9 +813,10 @@ fun Greeting() {
                                                     // the DropDown the same width
                                                     mTextFieldSize = coordinates.size.toSize()
                                                 },
-                                            label = { Text("Label") },
+                                            label = { Text("Left team") },
                                             trailingIcon = {
-                                                Icon(icon, "contentDescription",
+                                                Icon(
+                                                    icon, "contentDescription",
                                                     Modifier.clickable { mExpanded = !mExpanded })
                                             }
                                         )
@@ -782,7 +831,7 @@ fun Greeting() {
                                         ) {
                                             teams.forEach { team ->
                                                 DropdownMenuItem(onClick = {
-                                                    rightTeamId = team.id
+                                                    leftTeamId = team.id
                                                     mExpanded = false
                                                 }, text = {
                                                     Text(text = team.name)
@@ -793,7 +842,7 @@ fun Greeting() {
                                 }
 
 
-                                // Left team dropdown
+                                // Right team dropdown
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -815,10 +864,10 @@ fun Greeting() {
                                         // with icon and not expanded
                                         OutlinedTextField(
                                             value = teams.first {
-                                                it.id == leftTeamId
+                                                it.id == rightTeamId
                                             }.name,
                                             onValueChange = { value ->
-                                                leftTeamId = teams.first { team ->
+                                                rightTeamId = teams.first { team ->
                                                     value == team.name
                                                 }.id
                                             },
@@ -829,9 +878,10 @@ fun Greeting() {
                                                     // the DropDown the same width
                                                     mTextFieldSize = coordinates.size.toSize()
                                                 },
-                                            label = { Text("Label") },
+                                            label = { Text("Right team") },
                                             trailingIcon = {
-                                                Icon(icon, "contentDescription",
+                                                Icon(
+                                                    icon, "contentDescription",
                                                     Modifier.clickable { mExpanded = !mExpanded })
                                             }
                                         )
@@ -846,7 +896,7 @@ fun Greeting() {
                                         ) {
                                             teams.forEach { team ->
                                                 DropdownMenuItem(onClick = {
-                                                    leftTeamId = team.id
+                                                    rightTeamId = team.id
                                                     mExpanded = false
                                                 }, text = {
                                                     Text(text = team.name)
@@ -912,39 +962,73 @@ fun Greeting() {
                 }
             }
         }
+    }
 
-        // Screen content
-        val dev = LocalInspectionMode.current;
-        DisposableEffect(LocalContext.current) {
-            val observer = LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_START && !dev) {
-                    updateMatches(api, matches)
-
-                    matchHandler = api.createEventHandler({}, {
+    // Screen content
+    val dev = LocalInspectionMode.current;
+    DisposableEffect(LocalContext.current) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START && !dev) {
+                thread {
+                    if (determineRightScreen(api).contains(SourceActivity.MatchManager)) {
                         updateMatches(api, matches)
-                    },{
-                        switchToGameView(ctx);
-                    },{
-                        switchToGameView(ctx);
-                    },{});
-                } else if (dev) {
-                    matches.clear()
-                    matches.add(
-                        Match(
-                            -1,
-                            Match.State.UPCOMING,
-                            Match.Result.NOT_FINISHED,
-                            Team(1, "Test"),
-                            Team(2, "Test")
-                        )
-                    )
-                }
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
 
-            onDispose {
-                lifecycleOwner.lifecycle.removeObserver(observer)
+                        eventStream =
+                            api.createEventHandler(
+                                { e ->
+                                    if (e == null) return@createEventHandler
+                                    when (e) {
+                                        EventStreamWebsocketHandler.Event.TEAM_UPDATE_EVENT -> {}
+                                        EventStreamWebsocketHandler.Event.MATCH_UPDATE_EVENT -> {
+                                            updateMatches(api, matches)
+                                        }
+
+                                        EventStreamWebsocketHandler.Event.MATCH_ARM -> {
+                                            switchToGameView(ctx)
+                                        }
+
+                                        EventStreamWebsocketHandler.Event.MATCH_RESET -> {}
+                                        EventStreamWebsocketHandler.Event.MATCH_START -> {
+                                            switchToGameView(ctx)
+                                        }
+
+                                        EventStreamWebsocketHandler.Event.MATCH_RECYCLE -> {
+                                            switchToGameView(ctx)
+                                        }
+
+                                        EventStreamWebsocketHandler.Event.MATCH_END -> {}
+                                    }
+                                },
+                                { s ->
+                                    Toast.makeText(
+                                        ctx,
+                                        "Event stream failed! $s",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    eventStream?.close()
+                                })
+                    } else {
+                        switchToGameView(ctx)
+                    }
+                }
+            } else if (dev) {
+                matches.clear()
+                matches.add(
+                    Match(
+                        -1,
+                        Match.State.UPCOMING,
+                        Match.Result.NOT_FINISHED,
+                        Team(1, "Test", "000000","000000"),
+                        Team(2, "Test", "000000","000000")
+                    )
+                )
             }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            eventStream?.close();
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 }
@@ -965,8 +1049,8 @@ fun updateMatches(api: CVSSAPI, matches: SnapshotStateList<Match>) {
                         -1,
                         Match.State.UPCOMING,
                         Match.Result.NOT_FINISHED,
-                        Team(1, "Test"),
-                        Team(2, "Test")
+                        Team(1, "Test", "000000","000000"),
+                        Team(2, "Test", "000000","000000")
                     )
                 )
             }
