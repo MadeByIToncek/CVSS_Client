@@ -149,6 +149,7 @@ fun ScoreControl() {
                                             EventStreamWebsocketHandler.Event.MATCH_END -> {
                                                 switchToPrepareView(ctx);
                                             }
+                                            EventStreamWebsocketHandler.Event.SCORE_CHANGED -> {}
                                         }
                                     },
                                     { s ->

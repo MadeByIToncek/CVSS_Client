@@ -1,4 +1,4 @@
-package space.itoncek.client
+package space.itoncek.cvss.client
 
 import org.junit.Test
 

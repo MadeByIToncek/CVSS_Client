@@ -11,9 +11,11 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.function.Consumer;
 
+import kotlin.Pair;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -33,7 +35,9 @@ public class CVSSAPI {
         }
         File cfgfile = new File(f + "/config.cfg");
         if (!cfgfile.exists()) {
+            //noinspection ResultOfMethodCallIgnored
             f.mkdirs();
+            //noinspection ResultOfMethodCallIgnored
             cfgfile.createNewFile();
         }
 
@@ -85,7 +89,12 @@ public class CVSSAPI {
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
 
-                at.add(new Team(o.getInt("id"), o.getString("name"), o.getString("colorDark"), o.getString("colorBright")));
+                JSONArray members = o.getJSONArray("members");
+                List<String> mem = new ArrayList<>();
+                for (int j = 0; j < members.length(); j++) {
+                    mem.add(members.getString(j));
+                }
+                at.add(new Team(o.getInt("id"), o.getString("name"), o.getString("colorDark"), o.getString("colorBright"), mem));
             }
             return at;
         } catch (IOException e) {
@@ -102,6 +111,28 @@ public class CVSSAPI {
                 .toString(4), MediaType.parse("application/json"))).url(url + "/teams/team").build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
+            if (!res.body().string().trim().equals("ok")) {
+                throw new IOException("Unable to update the team!");
+            }
+        }
+    }
+
+    public void updateTeamMembers(int id, List<String> teamMembers) throws JSONException, IOException {
+        JSONArray a = new JSONArray();
+        for (String s : teamMembers) {
+            a.put(s);
+        }
+
+        Request request = new Request.Builder()
+                .patch(RequestBody.create(new JSONObject()
+                        .put("id", id)
+                        .put("members", a)
+                        .toString(4), MediaType.parse("application/json")))
+                .url(url + "/teams/teamMembers").build();
+
+        try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             if (!res.body().string().trim().equals("ok")) {
                 throw new IOException("Unable to update the team!");
             }
@@ -134,7 +165,12 @@ public class CVSSAPI {
         try (Response res = client.newCall(request).execute()) {
             if (res.body() == null) return null;
             JSONObject o = new JSONObject(res.body().string());
-            return new Team(o.getInt("id"), o.getString("name"), o.getString("colorDark"), o.getString("colorBright"));
+            JSONArray members = o.getJSONArray("members");
+            List<String> mem = new ArrayList<>();
+            for (int i = 0; i < members.length(); i++) {
+                mem.add(members.getString(i));
+            }
+            return new Team(o.getInt("id"), o.getString("name"), o.getString("colorDark"), o.getString("colorBright"), mem);
         }
     }
 
@@ -165,6 +201,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             if (!res.body().string().trim().equals("ok")) {
                 throw new IOException("Unable to update the team!");
             }
@@ -218,6 +255,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             return res.body().string().trim().equals("ok");
         }
     }
@@ -229,6 +267,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             return res.body().string().trim().equals("ok");
         }
     }
@@ -244,6 +283,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             return res.body().string().trim().equals("ok");
         }
     }
@@ -255,6 +295,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             return res.body().string().trim().equals("ok");
         }
     }
@@ -266,6 +307,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             String ok = res.body().string();
             Log.i("debdeb", ok);
             return ok.trim().equals("ok");
@@ -279,6 +321,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             String ok = res.body().string();
             Log.i("debdeb", ok);
             return Boolean.parseBoolean(ok);
@@ -292,6 +335,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             String ok = res.body().string();
             Log.i("debdeb", ok);
             return Boolean.parseBoolean(ok);
@@ -305,6 +349,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             String ok = res.body().string();
             Log.i("debdeb", ok);
             return ok.trim().equals("ok");
@@ -326,6 +371,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             String ok = res.body().string();
             Log.i("debdeb", ok);
             return ok.trim().equals("ok");
@@ -339,6 +385,7 @@ public class CVSSAPI {
                 .build();
 
         try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
             String ok = res.body().string();
             Log.i("debdeb", ok);
             return ok.trim().equals("ok");
@@ -353,6 +400,33 @@ public class CVSSAPI {
                 assert res.body() != null;
                 return Integer.parseInt(res.body().string());
             } else return -1;
+        }
+    }
+
+    @NotNull
+    public Pair<Integer, Integer> getCurrentMatchScore() throws IOException, JSONException {
+        Request request = new Request.Builder().url(url + "/score/matchScore").build();
+        try (Response execute = client.newCall(request).execute()) {
+            assert execute.body() != null;
+            String s = execute.body().string();
+            Log.i("debdeb", s);
+            JSONObject body = new JSONObject(s);
+            return new Pair<>(body.getInt("left"),body.getInt("right"));
+        }
+    }
+    @NotNull
+    public Pair<Team, Team> getCurrentMatchSides() throws IOException, JSONException {
+        Request left = new Request.Builder().url(url + "/match/leftTeamId").build();
+        Request right = new Request.Builder().url(url + "/match/rightTeamId").build();
+        try (Response lexec = client.newCall(left).execute();
+             Response rexec = client.newCall(right).execute()) {
+            assert lexec.body() != null;
+            assert rexec.body() != null;
+            String ls = lexec.body().string();
+            String rs = rexec.body().string();
+            Log.i("debdeb", ls);
+            Log.i("debdeb", rs);
+            return new Pair<>(getTeam(Integer.parseInt(ls)),getTeam(Integer.parseInt(rs)));
         }
     }
 

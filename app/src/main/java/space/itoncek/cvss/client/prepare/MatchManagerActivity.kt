@@ -997,6 +997,7 @@ fun Greeting() {
                                         }
 
                                         EventStreamWebsocketHandler.Event.MATCH_END -> {}
+                                        EventStreamWebsocketHandler.Event.SCORE_CHANGED -> {}
                                     }
                                 },
                                 { s ->
@@ -1018,8 +1019,8 @@ fun Greeting() {
                         -1,
                         Match.State.UPCOMING,
                         Match.Result.NOT_FINISHED,
-                        Team(1, "Test", "000000","000000"),
-                        Team(2, "Test", "000000","000000")
+                        Team(1, "Test", "000000","000000", listOf("")),
+                        Team(2, "Test", "000000","000000", listOf(""))
                     )
                 )
             }
@@ -1049,8 +1050,8 @@ fun updateMatches(api: CVSSAPI, matches: SnapshotStateList<Match>) {
                         -1,
                         Match.State.UPCOMING,
                         Match.Result.NOT_FINISHED,
-                        Team(1, "Test", "000000","000000"),
-                        Team(2, "Test", "000000","000000")
+                        Team(1, "Test", "000000","000000", listOf("")),
+                        Team(2, "Test", "000000","000000", listOf(""))
                     )
                 )
             }

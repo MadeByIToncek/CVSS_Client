@@ -54,6 +54,7 @@ public abstract class EventStreamWebsocketHandler extends WebSocketListener impl
 
     @Override
     public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, Response response) {
+        assert response != null;
         wsFail(response.message());
         Log.e(this.getClass().getName(), "WS Fault", t);
     }
@@ -72,6 +73,8 @@ public abstract class EventStreamWebsocketHandler extends WebSocketListener impl
         MATCH_RESET,
         MATCH_START,
         MATCH_RECYCLE,
-        MATCH_END
+        MATCH_END,
+        SCORE_CHANGED
     }
+
 }

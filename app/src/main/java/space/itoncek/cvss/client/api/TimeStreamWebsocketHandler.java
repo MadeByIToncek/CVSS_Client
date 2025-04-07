@@ -59,7 +59,7 @@ public abstract class TimeStreamWebsocketHandler extends WebSocketListener imple
     }
 
     @Override
-    public void onFailure(@NonNull WebSocket webSocket, Throwable t, Response response) {
+    public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, Response response) {
         Log.e(this.getClass().getName(), "WS Fault", t);
     }
 

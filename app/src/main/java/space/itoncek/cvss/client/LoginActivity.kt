@@ -50,7 +50,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import space.itoncek.cvss.client.api.CVSSAPI
 import space.itoncek.cvss.client.prepare.TeamManagerActivity
-import space.itoncek.cvss.client.runOnUiThread
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import java.io.File
 import java.io.FileWriter

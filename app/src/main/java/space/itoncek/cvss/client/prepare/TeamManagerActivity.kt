@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -79,6 +80,7 @@ import space.itoncek.cvss.client.switchToGameView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
 import androidx.core.graphics.toColorInt
+import okhttp3.internal.wait
 
 class TeamManagerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -105,10 +107,12 @@ fun MainUI() {
     val teams = remember { mutableStateListOf<Team>() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var showBottomSheet by remember { mutableStateOf(false) }
+    var showTeamEditor by remember { mutableStateOf(false) }
+    var showTeamMemberEditor by remember { mutableStateOf(false) }
     var createInsteadOfEdit by remember { mutableStateOf(false) }
     var selectedTeam by remember { mutableIntStateOf(-1) }
     val sheetState = rememberModalBottomSheetState()
+    val memberEditorSheetState = rememberModalBottomSheetState()
     var showDeletionDialog by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
@@ -147,7 +151,7 @@ fun MainUI() {
                 FloatingActionButton(
                     onClick = {
                         createInsteadOfEdit = true
-                        showBottomSheet = true
+                        showTeamEditor = true
                     },
                 ) {
                     Icon(Icons.Filled.Add, "Floating action button.")
@@ -218,7 +222,14 @@ fun MainUI() {
                             }
                             FilledIconButton(onClick = {
                                 createInsteadOfEdit = false
-                                showBottomSheet = true
+                                showTeamMemberEditor = true
+                                selectedTeam = teams[team].id;
+                            }) {
+                                Icon(Icons.Outlined.Face, "")
+                            }
+                            FilledIconButton(onClick = {
+                                createInsteadOfEdit = false
+                                showTeamEditor = true
                                 selectedTeam = teams[team].id;
                             }) {
                                 Icon(Icons.Filled.Edit, "")
@@ -228,10 +239,11 @@ fun MainUI() {
                 }
             }
             var requestFailed by remember { mutableStateOf(false) }
-            if (showBottomSheet) {
+
+            if (showTeamEditor) {
                 ModalBottomSheet(
                     onDismissRequest = {
-                        showBottomSheet = false
+                        showTeamEditor = false
                     }, sheetState = sheetState,
                     containerColor = if (requestFailed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer
                 ) {
@@ -247,8 +259,8 @@ fun MainUI() {
                         var teamColorBright by remember { mutableStateOf("") }
                         var teamColorDark by remember { mutableStateOf("") }
 
-                        LaunchedEffect(showBottomSheet) {
-                            if (showBottomSheet) {
+                        LaunchedEffect(showTeamEditor) {
+                            if (showTeamEditor) {
                                 thread {
                                     teams.clear()
                                     val teamss = api.listTeams();
@@ -306,7 +318,9 @@ fun MainUI() {
                                 onValueChange = {
                                     teamName = it
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth(.9f)
+                                    .padding(vertical = 8.dp),
                                 placeholder = {
                                     Text("Team name", color = Color.Gray)
                                 })
@@ -315,7 +329,9 @@ fun MainUI() {
                                 onValueChange = {
                                     teamColorBright = it
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth(.9f)
+                                    .padding(vertical = 8.dp),
                                 placeholder = {
                                     Text("Team color", color = Color.Gray)
                                 })
@@ -324,7 +340,9 @@ fun MainUI() {
                                 onValueChange = {
                                     teamColorDark = it
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth(.9f)
+                                    .padding(vertical = 8.dp),
                                 placeholder = {
                                     Text("Team color", color = Color.Gray)
                                 })
@@ -333,7 +351,7 @@ fun MainUI() {
                                     onClick = {
                                         scope.launch { sheetState.hide() }.invokeOnCompletion {
                                             if (!sheetState.isVisible) {
-                                                showBottomSheet = false
+                                                showTeamEditor = false
                                             }
                                         }
                                     },
@@ -361,10 +379,147 @@ fun MainUI() {
                                         scope.launch { sheetState.hide() }.invokeOnCompletion {
                                             if (!sheetState.isVisible) {
                                                 createInsteadOfEdit = false
-                                                showBottomSheet = false
+                                                showTeamEditor = false
                                                 selectedTeam = -1
                                             }
                                         }
+                                    }, modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp)
+                                ) {
+                                    Text("Save")
+                                }
+                            }
+                        }
+                    }
+                    // Sheet content
+                }
+            }
+            if (showTeamMemberEditor) {
+                ModalBottomSheet(
+                    onDismissRequest = {
+                        showTeamMemberEditor = false
+                    }, sheetState = memberEditorSheetState,
+                    containerColor = if (requestFailed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .wrapContentHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        var loading by remember { mutableStateOf(true) }
+                        var teamName by remember { mutableStateOf("") }
+                        val teamMembers = remember { mutableStateListOf<String>()}
+
+                        LaunchedEffect(showTeamMemberEditor) {
+                            if (showTeamEditor || sheetState.isVisible) {
+                                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                    if (!sheetState.isVisible) {
+                                        showTeamEditor = false
+                                    }
+                                }
+                            }
+                            if (showTeamMemberEditor) {
+                                thread {
+                                    teams.clear()
+                                    val teamss = api.listTeams();
+                                    if (teamss == null) {
+                                        requestFailed = true
+                                        runOnUiThread {
+                                            Toast.makeText(
+                                                ctx,
+                                                "Unable to load the teams",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        return@thread
+                                    } else teamss.forEach {
+                                        teams.add(it);
+                                    }
+
+                                    val team = api.getTeam(selectedTeam);
+                                    if (team != null) {
+                                        requestFailed = false
+                                        teamName = team.name
+                                        teamMembers.clear()
+                                        teamMembers.addAll(team.members)
+                                        loading = false
+                                        return@thread
+                                    } else {
+                                        requestFailed = true
+                                        Toast.makeText(
+                                            ctx,
+                                            "Unable to load the match",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }.join()
+                            }
+                        }
+                        if (loading) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.secondary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                            Text(
+                                "Loading", modifier = Modifier
+                                    .padding(8.dp)
+                                    .padding(bottom = 16.dp)
+                            )
+                        } else if (requestFailed) {
+                            Text(
+                                "Request failed!",
+                                fontSize = 32.sp,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text("Please check your connectivity & server logs for more info.")
+                        } else {
+                            Text("Editing team members of $teamName", modifier = Modifier
+                                .fillMaxWidth(.9f)
+                                .padding(vertical = 8.dp))
+
+                            for (i in 0 until teamMembers.count()) {
+                                TextField(
+                                    teamMembers[i],
+                                    onValueChange = {
+                                        teamMembers[i] = it
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth(.9f)
+                                        .padding(vertical = 8.dp),
+                                    placeholder = {
+                                        Text("Team member #$i", color = Color.Gray)
+                                    })
+                            }
+
+                            Row {
+                                Button(
+                                    onClick = {
+                                        teamMembers.add("")
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth(.6f)
+                                        .padding(8.dp)
+                                ) {
+                                    Text("Add Team member")
+                                }
+                                Button(
+                                    onClick = {
+                                        thread {
+                                            api.updateTeamMembers(selectedTeam, teamMembers)
+                                        }.join()
+                                        updateTeams(api, teams)
+
+                                        scope.launch { memberEditorSheetState.hide() }
+                                            .invokeOnCompletion {
+                                                if (!memberEditorSheetState.isVisible) {
+                                                    createInsteadOfEdit = false
+                                                    showTeamMemberEditor = false
+                                                    selectedTeam = -1
+                                                }
+                                            }
                                     }, modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(8.dp)
@@ -407,6 +562,7 @@ fun MainUI() {
                                         switchToGameView(ctx)
                                     }
                                     EventStreamWebsocketHandler.Event.MATCH_END -> {}
+                                    EventStreamWebsocketHandler.Event.SCORE_CHANGED -> {}
                                 }
                             },
                             { s ->
@@ -423,9 +579,9 @@ fun MainUI() {
                 }
             } else if (dev) {
                 teams.clear()
-                teams.add(Team(-1, "Dev mode!", "000000","000000"))
-                teams.add(Team(-2, "Dev mode!", "000000","000000"))
-                teams.add(Team(-3, "Dev mode!", "000000","000000"))
+                teams.add(Team(-1, "Dev mode!", "000000","000000", listOf("")))
+                teams.add(Team(-2, "Dev mode!", "000000","000000", listOf("")))
+                teams.add(Team(-3, "Dev mode!", "000000","000000", listOf("")))
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -454,7 +610,7 @@ fun updateTeams(api: CVSSAPI, teams: SnapshotStateList<Team>) {
                 teams.addAll(t)
             } else {
                 teams.clear()
-                teams.add(Team(-1, "CONNECTION ERROR!", "000000","000000"))
+                teams.add(Team(-1, "CONNECTION ERROR!", "000000","000000", listOf("")))
             }
         }
     }.join()
