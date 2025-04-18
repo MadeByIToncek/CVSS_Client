@@ -1,5 +1,8 @@
 package space.itoncek.cvss.client.play
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
@@ -51,6 +54,7 @@ import space.itoncek.cvss.client.SourceActivity
 import space.itoncek.cvss.client.api.CVSSAPI
 import space.itoncek.cvss.client.api.EventStreamWebsocketHandler
 import space.itoncek.cvss.client.determineRightScreen
+import space.itoncek.cvss.client.prepare.OverlaySetupActivity
 import space.itoncek.cvss.client.switchToPrepareView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
@@ -223,15 +227,16 @@ fun OverlayControl() {
                                             EventStreamWebsocketHandler.Event.MATCH_UPDATE_EVENT -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_ARM -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_RESET -> {
-                                                switchToPrepareView(ctx);
+                                                switchToOverlayPrepareView(ctx);
                                             }
 
                                             EventStreamWebsocketHandler.Event.MATCH_START -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_RECYCLE -> {}
                                             EventStreamWebsocketHandler.Event.MATCH_END -> {
-                                                switchToPrepareView(ctx);
+                                                switchToOverlayPrepareView(ctx);
                                             }
                                             EventStreamWebsocketHandler.Event.SCORE_CHANGED -> {}
+                                            EventStreamWebsocketHandler.Event.GRAPHICS_UPDATE_EVENT -> {}
                                         }
                                     },
                                     { s ->
@@ -257,6 +262,12 @@ fun OverlayControl() {
         }
     }
 }
+
+fun switchToOverlayPrepareView(ctx: Context) {
+    ctx.startActivity(Intent(ctx,OverlaySetupActivity::class.java))
+    (ctx as? Activity)?.finish()
+}
+
 @Preview(
     name = "Dynamic Red Dark",
     group = "dark",

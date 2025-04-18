@@ -21,6 +21,11 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
         <activity
+            android:name=".prepare.OverlaySetupActivity"
+            android:exported="false"
+            android:label="@string/title_activity_overlay_setup"
+            android:theme="@style/Theme.CVSSClientTheme" />
+        <activity
             android:name=".play.OverlayControlActivity"
             android:exported="false"
             android:label="@string/title_activity_overlay_control"

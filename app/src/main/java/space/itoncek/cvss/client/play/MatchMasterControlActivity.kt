@@ -248,6 +248,7 @@ fun MatchMasterControl() {
                                                 leftScore = points.first
                                                 rightScore = points.second
                                             }
+                                            EventStreamWebsocketHandler.Event.GRAPHICS_UPDATE_EVENT -> {}
                                         }
                                     },
                                     { s ->

@@ -563,6 +563,7 @@ fun MainUI() {
                                     }
                                     EventStreamWebsocketHandler.Event.MATCH_END -> {}
                                     EventStreamWebsocketHandler.Event.SCORE_CHANGED -> {}
+                                    EventStreamWebsocketHandler.Event.GRAPHICS_UPDATE_EVENT ->{}
                                 }
                             },
                             { s ->

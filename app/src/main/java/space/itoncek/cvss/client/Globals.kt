@@ -27,6 +27,7 @@ import space.itoncek.cvss.client.play.MatchMasterControlActivity
 import space.itoncek.cvss.client.play.OverlayControlActivity
 import space.itoncek.cvss.client.play.ScoreControlActivity
 import space.itoncek.cvss.client.prepare.MatchManagerActivity
+import space.itoncek.cvss.client.prepare.OverlaySetupActivity
 import space.itoncek.cvss.client.prepare.TeamManagerActivity
 
 const val serverVersion = "v0.0.0.1"
@@ -72,6 +73,17 @@ fun GenerateNavigation(i: SourceActivity, scope: CoroutineScope, drawerState: Dr
                         if (i != SourceActivity.MatchManager) {
                             scope.launch { drawerState.close() }
                             ctx.startActivity(Intent(ctx, MatchManagerActivity::class.java))
+                            (ctx as Activity).finish()
+                        }
+                    }
+                )
+                NavigationDrawerItem(
+                    label = { Text("Overlay") },
+                    selected = i == SourceActivity.OverlaySetup,
+                    onClick = {
+                        if (i != SourceActivity.OverlaySetup) {
+                            scope.launch { drawerState.close() }
+                            ctx.startActivity(Intent(ctx, OverlaySetupActivity::class.java))
                             (ctx as Activity).finish()
                         }
                     }
@@ -144,7 +156,7 @@ fun determineRightScreen(api: CVSSAPI): List<SourceActivity> {
     return if(inGame || armed) {
         listOf(SourceActivity.MatchMasterControl, SourceActivity.ScoringControl, SourceActivity.OverlayControl)
     } else {
-        listOf(SourceActivity.TeamManager,SourceActivity.MatchManager)
+        listOf(SourceActivity.TeamManager,SourceActivity.MatchManager, SourceActivity.OverlaySetup)
     }
 }
 
@@ -161,6 +173,7 @@ fun switchToPrepareView(ctx: Context) {
 enum class SourceActivity {
     TeamManager,
     MatchManager,
+    OverlaySetup,
     MatchMasterControl,
     ScoringControl,
     OverlayControl

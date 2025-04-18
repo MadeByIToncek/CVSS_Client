@@ -21,6 +21,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import space.itoncek.cvss.client.api.objects.GraphicsInstance;
 import space.itoncek.cvss.client.api.objects.Match;
 import space.itoncek.cvss.client.api.objects.Team;
 
@@ -427,6 +428,83 @@ public class CVSSAPI {
             Log.i("debdeb", ls);
             Log.i("debdeb", rs);
             return new Pair<>(getTeam(Integer.parseInt(ls)),getTeam(Integer.parseInt(rs)));
+        }
+    }
+
+    @Nullable
+    public List<GraphicsInstance> listGraphicsInstances() {
+        Request request = new Request.Builder().url(url + "/overlay/instances").build();
+
+        try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
+            JSONArray arr = new JSONArray(res.body().string());
+            ArrayList<GraphicsInstance> at = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                at.add(new GraphicsInstance(o.getString("ident"), GraphicsInstance.GraphicsMode.valueOf(o.getString("mode"))));
+            }
+            return at;
+        } catch (IOException | JSONException e) {
+            return null;
+        }
+    }
+
+    public @Nullable GraphicsInstance getGraphicsInstance(String ident) throws JSONException {
+        Request request = new Request.Builder()
+                .url(url + "/overlay/instance")
+                .put(RequestBody.create(new JSONObject().put("ident", ident).toString(4), MediaType.parse("application/json")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            if (res.body() == null) return null;
+            JSONObject o = new JSONObject(res.body().string());
+            return new GraphicsInstance(o.getString("ident"), GraphicsInstance.GraphicsMode.valueOf(o.getString("mode")));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+
+
+    public void updateGraphicsInstance(String ident, @NotNull GraphicsInstance.GraphicsMode mode) throws JSONException, IOException {
+        Request request = new Request.Builder().patch(RequestBody.create(new JSONObject()
+                .put("ident", ident)
+                .put("mode", mode)
+                .toString(4), MediaType.parse("application/json"))).url(url + "/overlay/instance").build();
+
+        try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
+            if (!res.body().string().trim().equals("ok")) {
+                throw new IOException("Unable to update the team!");
+            }
+        }
+    }
+
+    public boolean getProbe() throws IOException {
+        Request request = new Request.Builder()
+                .url(url + "/overlay/probe")
+                .get()
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return Boolean.parseBoolean(ok);
+        }
+    }
+
+    public boolean setProbe(boolean value) throws IOException {
+        Request request = new Request.Builder()
+                .url(url + "/overlay/probe")
+                .patch(RequestBody.create(Boolean.toString(value), MediaType.get("text/plain")))
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            assert res.body() != null;
+            String ok = res.body().string();
+            Log.i("debdeb", ok);
+            return ok.trim().equals("ok");
         }
     }
 

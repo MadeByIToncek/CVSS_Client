@@ -150,6 +150,7 @@ fun ScoreControl() {
                                                 switchToPrepareView(ctx);
                                             }
                                             EventStreamWebsocketHandler.Event.SCORE_CHANGED -> {}
+                                            EventStreamWebsocketHandler.Event.GRAPHICS_UPDATE_EVENT -> {}
                                         }
                                     },
                                     { s ->

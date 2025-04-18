@@ -74,7 +74,9 @@ public abstract class EventStreamWebsocketHandler extends WebSocketListener impl
         MATCH_START,
         MATCH_RECYCLE,
         MATCH_END,
-        SCORE_CHANGED
+        SCORE_CHANGED,
+        GRAPHICS_UPDATE_EVENT
     }
+
 
 }
