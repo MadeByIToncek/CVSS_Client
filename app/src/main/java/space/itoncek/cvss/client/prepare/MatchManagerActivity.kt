@@ -66,10 +66,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Brush.Companion.horizontalGradient
-import androidx.compose.ui.graphics.Color.Companion.Blue
-import androidx.compose.ui.graphics.Color.Companion.Green
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -92,7 +89,6 @@ import space.itoncek.cvss.client.api.objects.Team
 import space.itoncek.cvss.client.determineRightScreen
 import space.itoncek.cvss.client.runOnUiThread
 import space.itoncek.cvss.client.switchToGameView
-import space.itoncek.cvss.client.switchToPrepareView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
 
@@ -114,8 +110,8 @@ private var eventStream: EventStreamWebsocketHandler? = null
 @Composable
 fun Greeting() {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val ctx = LocalContext.current;
-    val api = CVSSAPI(ctx.filesDir);
+    val ctx = LocalContext.current
+    val api = CVSSAPI(ctx.filesDir)
     val matches = remember { mutableStateListOf<Match>() }
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -261,22 +257,22 @@ fun Greeting() {
                                 Spacer(modifier = Modifier.weight(1f))
                                 FilledIconButton(
                                     onClick = {
-                                        selectedMatchId = matches[match].id;
-                                        showStartDialog = true;
+                                        selectedMatchId = matches[match].id
+                                        showStartDialog = true
                                     }
                                 ) {
                                     Icon(Icons.Filled.PlayArrow, "")
                                 }
                                 FilledIconButton(
                                     onClick = {
-                                        selectedMatchId = matches[match].id;
-                                        showDeletionDialog = true;
+                                        selectedMatchId = matches[match].id
+                                        showDeletionDialog = true
                                     }
                                 ) {
                                     Icon(Icons.Filled.Delete, "")
                                 }
                                 FilledIconButton(onClick = {
-                                    selectedMatchId = matches[match].id;
+                                    selectedMatchId = matches[match].id
                                     showMatchEdit = true
                                 }) {
                                     Icon(Icons.Filled.Edit, "")
@@ -311,7 +307,7 @@ fun Greeting() {
                         LaunchedEffect(Unit) {
                             if (showMatchCreate) {
                                 thread {
-                                    val teamss = api.listTeams();
+                                    val teamss = api.listTeams()
                                     if (teamss == null) {
                                         Toast.makeText(
                                             ctx,
@@ -320,7 +316,7 @@ fun Greeting() {
                                         ).show()
                                         return@thread
                                     } else teamss.forEach {
-                                        teams.add(it);
+                                        teams.add(it)
                                     }
                                     runOnUiThread {
                                         ready = true
@@ -374,12 +370,12 @@ fun Greeting() {
                                         // Create an Outlined Text Field
                                         // with icon and not expanded
                                         OutlinedTextField(
-                                            value = if (rightTeamId < 0) "" else teams.first {
-                                                it.id == rightTeamId
+                                            value = if (leftTeamId < 0) "" else teams.first {
+                                                it.id == leftTeamId
                                             }.name,
                                             onValueChange = { value ->
                                                 if (value != "") {
-                                                    rightTeamId = teams.first { team ->
+                                                    leftTeamId = teams.first { team ->
                                                         value == team.name
                                                     }.id
                                                 }
@@ -409,7 +405,7 @@ fun Greeting() {
                                         ) {
                                             teams.forEach { team ->
                                                 DropdownMenuItem(onClick = {
-                                                    rightTeamId = team.id
+                                                    leftTeamId = team.id
                                                     mExpanded = false
                                                 }, text = {
                                                     Text(text = team.name)
@@ -442,12 +438,12 @@ fun Greeting() {
                                         // with icon and not expanded
                                         OutlinedTextField(
 
-                                            value = if (leftTeamId < 0) "" else teams.first {
-                                                it.id == leftTeamId
+                                            value = if (rightTeamId < 0) "" else teams.first {
+                                                it.id == rightTeamId
                                             }.name,
                                             onValueChange = { value ->
                                                 if (value != "") {
-                                                    leftTeamId = teams.first { team ->
+                                                    rightTeamId = teams.first { team ->
                                                         value == team.name
                                                     }.id
                                                 }
@@ -477,7 +473,7 @@ fun Greeting() {
                                         ) {
                                             teams.forEach { team ->
                                                 DropdownMenuItem(onClick = {
-                                                    leftTeamId = team.id
+                                                    rightTeamId = team.id
                                                     mExpanded = false
                                                 }, text = {
                                                     Text(text = team.name)
@@ -588,7 +584,7 @@ fun Greeting() {
                         LaunchedEffect(showMatchEdit) {
                             if (showMatchEdit) {
                                 thread {
-                                    val teamss = api.listTeams();
+                                    val teamss = api.listTeams()
                                     if (teamss == null) {
                                         requestFailed = true
                                         Toast.makeText(
@@ -598,16 +594,16 @@ fun Greeting() {
                                         ).show()
                                         return@thread
                                     } else teamss.forEach {
-                                        teams.add(it);
+                                        teams.add(it)
                                     }
 
-                                    val match = api.getMatch(selectedMatchId);
+                                    val match = api.getMatch(selectedMatchId)
                                     if (match != null) {
-                                        requestFailed = false;
-                                        matchState = match.state;
-                                        result = match.result;
-                                        leftTeamId = match.left.id;
-                                        rightTeamId = match.right.id;
+                                        requestFailed = false
+                                        matchState = match.state
+                                        result = match.result
+                                        leftTeamId = match.left.id
+                                        rightTeamId = match.right.id
                                         loading = false
                                         return@thread
                                     } else {
@@ -965,7 +961,7 @@ fun Greeting() {
     }
 
     // Screen content
-    val dev = LocalInspectionMode.current;
+    val dev = LocalInspectionMode.current
     DisposableEffect(LocalContext.current) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START && !dev) {
@@ -1029,7 +1025,7 @@ fun Greeting() {
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
-            eventStream?.close();
+            eventStream?.close()
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }

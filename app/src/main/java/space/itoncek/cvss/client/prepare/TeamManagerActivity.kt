@@ -65,6 +65,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.Wallpapers
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.toColorInt
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -79,8 +80,6 @@ import space.itoncek.cvss.client.runOnUiThread
 import space.itoncek.cvss.client.switchToGameView
 import space.itoncek.cvss.client.ui.theme.CVSSClientTheme
 import kotlin.concurrent.thread
-import androidx.core.graphics.toColorInt
-import okhttp3.internal.wait
 
 class TeamManagerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,8 +101,8 @@ private var eventStream: EventStreamWebsocketHandler? = null
 @Composable
 fun MainUI() {
     val lifecycleOwner = LocalLifecycleOwner.current
-    val ctx = LocalContext.current;
-    val api = CVSSAPI(ctx.filesDir);
+    val ctx = LocalContext.current
+    val api = CVSSAPI(ctx.filesDir)
     val teams = remember { mutableStateListOf<Team>() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -214,8 +213,8 @@ fun MainUI() {
                             Spacer(modifier = Modifier.weight(1f))
                             FilledIconButton(
                                 onClick = {
-                                    selectedTeam = teams[team].id;
-                                    showDeletionDialog = true;
+                                    selectedTeam = teams[team].id
+                                    showDeletionDialog = true
                                 }
                             ) {
                                 Icon(Icons.Filled.Delete, "")
@@ -223,14 +222,14 @@ fun MainUI() {
                             FilledIconButton(onClick = {
                                 createInsteadOfEdit = false
                                 showTeamMemberEditor = true
-                                selectedTeam = teams[team].id;
+                                selectedTeam = teams[team].id
                             }) {
                                 Icon(Icons.Outlined.Face, "")
                             }
                             FilledIconButton(onClick = {
                                 createInsteadOfEdit = false
                                 showTeamEditor = true
-                                selectedTeam = teams[team].id;
+                                selectedTeam = teams[team].id
                             }) {
                                 Icon(Icons.Filled.Edit, "")
                             }
@@ -263,7 +262,7 @@ fun MainUI() {
                             if (showTeamEditor) {
                                 thread {
                                     teams.clear()
-                                    val teamss = api.listTeams();
+                                    val teamss = api.listTeams()
                                     if (teamss == null) {
                                         requestFailed = true
                                         runOnUiThread {
@@ -275,15 +274,16 @@ fun MainUI() {
                                         }
                                         return@thread
                                     } else teamss.forEach {
-                                        teams.add(it);
+                                        teams.add(it)
                                     }
 
                                     if(!createInsteadOfEdit) {
-                                        val team = api.getTeam(selectedTeam);
+                                        val team = api.getTeam(selectedTeam)
                                         if (team != null) {
-                                            requestFailed = false;
-                                            teamName = team.name;
-                                            teamColorBright = team.colorDark;
+                                            requestFailed = false
+                                            teamName = team.name
+                                            teamColorBright = team.colorBright
+                                            teamColorDark = team.colorDark
                                             loading = false
                                             return@thread
                                         } else {
@@ -295,8 +295,8 @@ fun MainUI() {
                                             ).show()
                                         }
                                     } else {
-                                        requestFailed = false;
-                                        loading=false;
+                                        requestFailed = false
+                                        loading=false
                                     }
                                 }.join()
                             }
@@ -369,7 +369,7 @@ fun MainUI() {
                                     onClick = {
                                         thread {
                                             if (createInsteadOfEdit) {
-                                                api.createTeam(teamName, teamColorBright,teamColorDark )
+                                                api.createTeam(teamName, teamColorBright,teamColorDark)
                                             } else {
                                                 api.updateTeam(selectedTeam, teamName,teamColorBright,teamColorDark)
                                             }
@@ -424,7 +424,7 @@ fun MainUI() {
                             if (showTeamMemberEditor) {
                                 thread {
                                     teams.clear()
-                                    val teamss = api.listTeams();
+                                    val teamss = api.listTeams()
                                     if (teamss == null) {
                                         requestFailed = true
                                         runOnUiThread {
@@ -436,10 +436,10 @@ fun MainUI() {
                                         }
                                         return@thread
                                     } else teamss.forEach {
-                                        teams.add(it);
+                                        teams.add(it)
                                     }
 
-                                    val team = api.getTeam(selectedTeam);
+                                    val team = api.getTeam(selectedTeam)
                                     if (team != null) {
                                         requestFailed = false
                                         teamName = team.name
@@ -536,7 +536,7 @@ fun MainUI() {
 
         // Screen content
     }
-    val dev = LocalInspectionMode.current;
+    val dev = LocalInspectionMode.current
     DisposableEffect(LocalContext.current) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_START && !dev) {
@@ -588,7 +588,7 @@ fun MainUI() {
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
-            eventStream?.close();
+            eventStream?.close()
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
